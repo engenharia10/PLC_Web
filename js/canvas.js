@@ -40,6 +40,11 @@ class LadderCanvas {
         this.canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this._onMouseUp(e));
         this.canvas.addEventListener('wheel', (e) => this._onWheel(e));
+
+        // Touch events for Mobile/Android support
+        this.canvas.addEventListener('touchstart', (e) => this._onTouchStart(e), { passive: false });
+        this.canvas.addEventListener('touchmove', (e) => this._onTouchMove(e), { passive: false });
+        this.canvas.addEventListener('touchend', (e) => this._onTouchEnd(e));
     }
 
     get width() {
@@ -73,6 +78,30 @@ class LadderCanvas {
             x: e.clientX - rect.left,
             y: e.clientY - rect.top + this.scrollY
         };
+    }
+
+    // Wrappers para Touch Events (Mobile) usando a mesma lógica de Mouse Events
+    _onTouchStart(e) {
+        if (e.touches && e.touches.length > 0) {
+            e.preventDefault(); // Evita scroll do navegador ao tocar no canvas
+            const touch = e.touches[0];
+            const simEl = { clientX: touch.clientX, clientY: touch.clientY };
+            this._onMouseDown(simEl);
+        }
+    }
+
+    _onTouchMove(e) {
+        if (e.touches && e.touches.length > 0) {
+            e.preventDefault(); // Impede o "puxar para recarregar" e scroll
+            const touch = e.touches[0];
+            const simEvent = { clientX: touch.clientX, clientY: touch.clientY };
+            this._onMouseMove(simEvent);
+        }
+    }
+
+    _onTouchEnd(e) {
+        // Usa as coordenadas finais salvas (via dragOffsetY/etc), a lógica de up não usa a posição do mouse na versão atual do PWA
+        this._onMouseUp(e);
     }
 
     _onMouseDown(e) {

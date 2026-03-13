@@ -186,7 +186,7 @@ class Toolbar {
             btn.dataset.compType = compType;
             btn.innerHTML = `<span class="comp-icon">${data.icon}</span><span class="comp-label">${shortLabel}</span>`;
 
-            // Drag and drop
+            // Drag and drop HTML5 (Apenas para Desktop)
             btn.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', compType);
                 e.dataTransfer.effectAllowed = 'copy';
@@ -194,6 +194,44 @@ class Toolbar {
             });
             btn.addEventListener('dragend', () => {
                 btn.classList.remove('dragging');
+            });
+
+            // Tap/Click to Add (Para Mobile e usabilidade rápida)
+            btn.addEventListener('click', () => {
+                const isBranch = (compType === 'branch');
+                let targetX = 100;
+                let targetY = 80;
+
+                const app = this.app;
+                if (app.selectedElement && !isBranch) {
+                    // Adiciona logo após o componente selecionado
+                    targetX = app.selectedElement.x + 80;
+                    targetY = app.selectedElement.y;
+                } else if (app.rungs.length > 0) {
+                    // Adiciona na última rung, em um espaço livre ou no começo
+                    const lastRung = app.rungs[app.rungs.length - 1];
+                    targetY = lastRung.y;
+                    
+                    // Acha elemento mais a direita nesta rung
+                    const rEls = app.elements.filter(e => Math.abs((e.rung_y || e.y) - targetY) < 10);
+                    if (rEls.length > 0) {
+                         const maxR = Math.max(...rEls.map(e => e.x + (e.width || 0)));
+                         targetX = maxR + 80;
+                    }
+                }
+
+                // Ajusta caso passe da margem direita (tela inteira no mobile)
+                const cv = document.getElementById('ladder-canvas');
+                let cssWidth = 800;
+                if (cv) cssWidth = cv.getBoundingClientRect().width;
+                if (targetX > cssWidth - 60) targetX = 100; // Reseta x
+
+                // Usa as coordenadas de tela simuladas pra reusar lógica do handleDrop
+                const cvRect = cv.getBoundingClientRect();
+                const simClientX = cvRect.left + targetX;
+                const simClientY = cvRect.top + targetY - app.ladderCanvas.scrollY;
+                
+                app.ladderCanvas.handleDrop(compType, simClientX, simClientY);
             });
 
             palette.appendChild(btn);

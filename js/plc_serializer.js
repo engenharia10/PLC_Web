@@ -540,21 +540,16 @@ class PLCSerializer {
                 continue;
             }
 
-            let srcA = math.source_a || '0';
+            let srcA = math.source_a || '';
             let srcB = math.source_b || math.preset || '2';
-            
-            let typeA = 0; let valA = parseInt(srcA) || 0;
-            let typeB = 0; let valB = parseInt(srcB) || 0;
-            
-            if (typeof srcA === 'string') {
-                if (srcA.startsWith('C') && !isNaN(parseInt(srcA.slice(1)))) { typeA = 1; valA = parseInt(srcA.slice(1)); }
-                else if (srcA.startsWith('T') && !isNaN(parseInt(srcA.slice(1)))) { typeA = 2; valA = parseInt(srcA.slice(1)); }
-                else if (srcA.startsWith('M') && !isNaN(parseInt(srcA.slice(1)))) { typeA = 3; valA = parseInt(srcA.slice(1)); }
-                else if (srcA.startsWith('V') && !isNaN(parseInt(srcA.slice(1)))) { typeA = 4; valA = parseInt(srcA.slice(1)); }
-            }
-            if (typeof srcB === 'string') {
-                if (srcB.startsWith('V') && !isNaN(parseInt(srcB.slice(1)))) { typeB = 4; valB = parseInt(srcB.slice(1)); }
-            }
+
+            // Auto-detect source_a: escaneia elemento à esquerda (igual ao Python)
+            if (!srcA || srcA === '0') srcA = autoDetectSrcA(math);
+
+            const pA = parseCmpSrc(srcA);
+            const pB = parseCmpSrc(srcB);
+            let typeA = pA.type, valA = pA.val;
+            let typeB = pB.type, valB = pB.val;
 
             payload.push(0x09); // MATH type
             payload.push(i & 0xFF);

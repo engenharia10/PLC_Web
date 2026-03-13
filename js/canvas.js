@@ -66,6 +66,9 @@ class LadderCanvas {
     dragOffsetY = 0;
     startX = 0;
     startY = 0;
+    isPanning = false;
+    panStartY = 0;
+    panInitialScrollY = 0;
 
     _onWheel(e) {
         e.preventDefault();
@@ -88,7 +91,17 @@ class LadderCanvas {
             e.preventDefault(); // Evita scroll do navegador ao tocar no canvas
             const touch = e.touches[0];
             const simEl = { clientX: touch.clientX, clientY: touch.clientY };
+            
+            this.isPanning = false;
             this._onMouseDown(simEl);
+            
+            // Se clicou no vazio, inicia o modo Pan da câmera
+            if (!this.isDragging && !this.isResizing) {
+                this.isPanning = true;
+                this.panStartY = touch.clientY;
+                this.panInitialScrollY = this.scrollY;
+                this._wasDragged = false;
+            }
         }
     }
 
@@ -96,13 +109,26 @@ class LadderCanvas {
         if (e.touches && e.touches.length > 0) {
             e.preventDefault(); // Impede o "puxar para recarregar" e scroll
             const touch = e.touches[0];
-            const simEvent = { clientX: touch.clientX, clientY: touch.clientY };
-            this._onMouseMove(simEvent);
+            
+            if (this.isPanning) {
+                // Modo panning (arrastando a tela pra ver mais rungs pra baixo/cima)
+                const deltaY = touch.clientY - this.panStartY;
+                if (Math.abs(deltaY) > 5) {
+                    this._wasDragged = true; // marca como arraste
+                }
+                this.scrollY = this.panInitialScrollY - deltaY;
+                this.scrollY = Math.max(0, Math.min(this.scrollY, this.maxScrollY));
+                this.render();
+            } else {
+                const simEvent = { clientX: touch.clientX, clientY: touch.clientY };
+                this._onMouseMove(simEvent);
+            }
         }
     }
 
     _onTouchEnd(e) {
-        // Usa as coordenadas finais salvas (via dragOffsetY/etc), a lógica de up não usa a posição do mouse na versão atual do PWA
+        this.isPanning = false;
+        // Usa as coordenadas finais salvas (via dragOffsetY/etc)
         this._onMouseUp(e);
     }
 

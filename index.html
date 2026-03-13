@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Editor Ladder PLC — Alfatronic. Editor visual de lógica Ladder para controladores PLC.">
+    <title>PLC Ladder Editor — Alfatronic</title>
+    <link rel="stylesheet" href="css/styles.css?v=7">
+    <link rel="icon" type="image/png" href="icons/icon-192.png">
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PLC Editor">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+    <div id="app">
+        <!-- Menu Bar -->
+        <div id="menubar"></div>
+
+        <!-- Toolbar -->
+        <div id="toolbar"></div>
+
+        <!-- Component Palette (horizontal, above canvas) -->
+        <div id="component-bar">
+            <div id="component-palette"></div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content">
+            <!-- Canvas Area -->
+            <div id="canvas-area">
+                <canvas id="ladder-canvas"></canvas>
+            </div>
+
+            <!-- Sidebar: Properties only -->
+            <div id="sidebar" style="display:none">
+                <div id="props-header">⚙️ Propriedades</div>
+                <div id="props-panel">
+                    <div id="props-content"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div id="statusbar">
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                <span id="status-text">PLC Ladder Editor — Pronto</span>
+            </div>
+            <div>
+                <span id="comm-status-indicator" style="color: #64748b; margin-right: 10px;">🔌 Desconectado</span>
+                <span id="status-model">ECU Max</span> |
+                <span id="status-theme">Tema Escuro</span>
+            </div>
+        </div>
+
+        <!-- Comm Modal -->
+        <div id="comm-modal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>📡 Comunicação PLC</h3>
+                    <button id="comm-close-btn" class="close-btn">×</button>
+                </div>
+                
+                <div class="modal-body">
+                    <div class="comm-tabs">
+                        <button id="tab-serial" class="tab-btn active">Serial / USB</button>
+                        <button id="tab-ble" class="tab-btn">BLE / Bluetooth</button>
+                    </div>
+
+                    <!-- Serial Tab -->
+                    <div id="panel-serial" class="tab-panel active">
+                        <div class="config-row">
+                            <label>Baudrate:</label>
+                            <select id="serial-baudrate">
+                                <option value="9600">9600</option>
+                                <option value="19200">19200</option>
+                                <option value="38400">38400</option>
+                                <option value="57600">57600</option>
+                                <option value="115200" selected>115200</option>
+                                <option value="230400">230400</option>
+                            </select>
+                        </div>
+                        <div class="action-row">
+                            <button id="serial-connect-btn" class="btn btn-primary">🔌 Conectar Serial</button>
+                            <button id="serial-disconnect-btn" class="btn btn-danger" disabled>Desconectar</button>
+                        </div>
+                    </div>
+
+                    <!-- BLE Tab -->
+                    <div id="panel-ble" class="tab-panel" style="display:none;">
+                        <p class="ble-help">Certifique-se que o Bluetooth está ativado. O navegador pedirá para você selecionar o dispositivo ESP32.</p>
+                        <div class="action-row">
+                            <button id="ble-connect-btn" class="btn btn-primary">📶 Scan e Conectar BLE</button>
+                            <button id="ble-disconnect-btn" class="btn btn-danger" disabled>Desconectar</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monitor Serial — janela flutuante independente -->
+    <div id="monitor-window" class="hidden">
+        <div id="monitor-titlebar">
+            <span>🖥️ Monitor Serial / BLE</span>
+            <div class="monitor-title-actions">
+                <button id="monitor-clear-btn" class="btn btn-small btn-secondary">Limpar</button>
+                <button id="monitor-close-btn" class="close-btn">×</button>
+            </div>
+        </div>
+        <div id="monitor-body">
+            <textarea id="monitor-terminal" readonly spellcheck="false"></textarea>
+            <div id="monitor-send-row">
+                <input type="text" id="monitor-send-input" placeholder="Enviar texto puro...">
+                <button id="monitor-send-btn" class="btn btn-secondary">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PWA Install Banner -->
+    <div id="pwa-install-banner">
+        <span class="pwa-banner-text">📲 Instalar PLC Editor no dispositivo</span>
+        <div class="pwa-banner-actions">
+            <button id="pwa-install-btn" class="btn btn-primary btn-small">Instalar</button>
+            <button id="pwa-dismiss-btn" class="pwa-close-btn">✕</button>
+        </div>
+    </div>
+
+    <!-- Scripts (ordem importa) -->
+    <script src="js/plc_protocol.js?v=8"></script>
+    <script src="js/serial_comm.js?v=8"></script>
+    <script src="js/ble_comm.js?v=8"></script>
+    <script src="js/plc_serializer.js?v=9"></script>
+    <script src="js/themes.js?v=8"></script>
+    <script src="js/components.js?v=8"></script>
+    <script src="js/canvas.js?v=16"></script>
+    <script src="js/properties.js?v=9"></script>
+    <script src="js/toolbar.js?v=11"></script>
+    <script src="js/app.js?v=18"></script>
+    <script src="js/pwa.js?v=1"></script>
+</body>
+</html>

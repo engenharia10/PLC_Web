@@ -40,6 +40,7 @@
 
 html, body {
     height: 100%;
+    width: 100%;
     font-family: 'Inter', 'Segoe UI', sans-serif;
     background: var(--bg-dark);
     color: var(--text-color);
@@ -55,6 +56,8 @@ html, body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    width: 100vw;
+    overflow: hidden;
 }
 
 /* ===== Menu Bar ===== */
@@ -68,6 +71,9 @@ html, body {
     z-index: 1000;
     overflow-x: auto;
     white-space: nowrap;
+    max-width: 100%;
+    min-width: 0; /* Exclusivo para forçar flex-items a cliparem filhos no mobile */
+    box-sizing: border-box;
 }
 
 #menubar::-webkit-scrollbar {
@@ -159,6 +165,9 @@ html, body {
     gap: 2px;
     overflow-x: auto;
     white-space: nowrap;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .toolbar-btn {

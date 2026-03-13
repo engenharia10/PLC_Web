@@ -497,13 +497,11 @@ class LadderCanvas {
         }
         this._worldWidth = maxElemX + 50;
 
-        // Compute world height
+        // Compute world height (usa reduce para evitar stack overflow em arquivos grandes)
         let maxY = 200;
-        if (this.app.rungs.length > 0) maxY = Math.max(maxY, ...this.app.rungs.map(r => r.y));
-        if (this.app.elements.length > 0) {
-            maxY = Math.max(maxY, ...this.app.elements.map(e =>
-                e.type === 'branch' ? (e.branch_y || (e.y + 80)) : e.y
-            ));
+        for (const r of this.app.rungs) maxY = Math.max(maxY, r.y);
+        for (const e of this.app.elements) {
+            maxY = Math.max(maxY, e.type === 'branch' ? (e.branch_y || (e.y + 80)) : e.y);
         }
 
         const worldH = maxY + 600;

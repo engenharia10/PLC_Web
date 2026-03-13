@@ -153,8 +153,6 @@ class Toolbar {
             { icon: '💿', tooltip: 'Gravar Dados PLC', action: () => this.app.saveToFlash() },
             { type: 'separator' },
             { icon: '▶️', tooltip: 'Iniciar Simulador (F5)', action: () => this.app.toggleSimulation(), id: 'sim-btn' },
-            { type: 'separator' },
-            { icon: '🔍', tooltip: 'Ajustar à Tela', action: () => this.app.ladderCanvas.fitToScreen() },
         ];
 
         for (const btn of buttons) {

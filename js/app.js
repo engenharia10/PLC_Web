@@ -280,9 +280,11 @@ class PLCApp {
 
         if (this.rungs.length === 0) this.addRung();
         this.updateProperties();
-        // Reseta scroll para o topo para garantir que elementos sejam visíveis em qualquer tela
+        // Reseta view e ajusta zoom para caber na tela (resolve off-screen em mobile)
+        this.ladderCanvas.scrollX = 0;
         this.ladderCanvas.scrollY = 0;
-        this.ladderCanvas.render();
+        this.ladderCanvas.scale = 1;
+        this.ladderCanvas.fitToScreen();
     }
 
     // ===== Canvas Drag/Drop =====

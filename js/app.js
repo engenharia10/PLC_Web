@@ -580,6 +580,15 @@ class PLCApp {
             let packet = PLCProtocol.createLoadProgramPacket(payloadData);
             this.logComm(`> Pacote montado: ${packet.length} bytes.`);
 
+            // Pergunta se deseja proteger com senha
+            if (await this._confirmSimNao("Deseja proteger o programa com senha?")) {
+                const pwd = prompt("Digite a senha (máx. 32 caracteres):");
+                if (pwd) {
+                    packet = this._binAppendPassword(packet, pwd);
+                    this.logComm(`> Proteção por senha aplicada.`);
+                }
+            }
+
             // Dump completo em linhas de 16 bytes (offset | hex | ascii)
             {
                 const COLS = 16;
@@ -648,6 +657,181 @@ class PLCApp {
             this.logComm(`[ERRO] Falha ao gravar na Flash: ${e.message}`);
             alert(`Erro ao salvar na Flash:\n${e.message}`);
         }
+    }
+
+    // ===== Diálogo customizado Sim/Não =====
+    _confirmSimNao(message) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#1e293b;border:1px solid #475569;border-radius:8px;padding:24px 28px;min-width:280px;max-width:400px;font-family:sans-serif;color:#e2e8f0';
+
+            const msg = document.createElement('p');
+            msg.style.cssText = 'margin:0 0 20px;font-size:14px;line-height:1.5';
+            msg.textContent = message;
+
+            const btns = document.createElement('div');
+            btns.style.cssText = 'display:flex;gap:10px;justify-content:flex-end';
+
+            const btnSim = document.createElement('button');
+            btnSim.textContent = 'Sim';
+            btnSim.style.cssText = 'padding:7px 22px;background:#3b82f6;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:13px;font-weight:600';
+
+            const btnNao = document.createElement('button');
+            btnNao.textContent = 'Não';
+            btnNao.style.cssText = 'padding:7px 22px;background:#475569;color:#e2e8f0;border:none;border-radius:5px;cursor:pointer;font-size:13px';
+
+            const done = (val) => { document.body.removeChild(overlay); resolve(val); };
+            btnSim.onclick = () => done(true);
+            btnNao.onclick = () => done(false);
+
+            btns.appendChild(btnNao);
+            btns.appendChild(btnSim);
+            box.appendChild(msg);
+            box.appendChild(btns);
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+            btnSim.focus();
+        });
+    }
+
+    // ===== BIN password helpers (igual ao Python menu.py) =====
+    // Formato: [pacote AA55...checksum] + [BB CC] + [32 bytes senha UTF-8 null-padded]
+    _binHasPassword(data) {
+        return data.length >= 34 && data[data.length - 34] === 0xBB && data[data.length - 33] === 0xCC;
+    }
+
+    _binStripPassword(data) {
+        if (this._binHasPassword(data)) {
+            return { raw: data.slice(0, data.length - 34), pwdBytes: data.slice(data.length - 32) };
+        }
+        return { raw: data, pwdBytes: null };
+    }
+
+    _binVerifyPassword(pwdBytes, password) {
+        const enc = new TextEncoder().encode(password).slice(0, 32);
+        const padded = new Uint8Array(32);
+        padded.set(enc);
+        for (let i = 0; i < 32; i++) if (padded[i] !== pwdBytes[i]) return false;
+        return true;
+    }
+
+    _binAppendPassword(data, password) {
+        const enc = new TextEncoder().encode(password).slice(0, 32);
+        const padded = new Uint8Array(32);
+        padded.set(enc);
+        const result = new Uint8Array(data.length + 34);
+        result.set(data);
+        result[data.length]     = 0xBB;
+        result[data.length + 1] = 0xCC;
+        result.set(padded, data.length + 2);
+        return result;
+    }
+
+    // ===== Salvar BIN (gera + opção de senha + download) =====
+    async saveBin() {
+        if (!this.serializer) { alert("Módulo de serialização não carregado."); return; }
+        try {
+            const payloadData = this.serializer.serialize(this.elements, this.rungs);
+            let packet = PLCProtocol.createLoadProgramPacket(payloadData);
+
+            if (await this._confirmSimNao("Deseja proteger o arquivo .bin com senha?")) {
+                const pwd = prompt("Digite a senha (máx. 32 caracteres):");
+                if (pwd) {
+                    packet = this._binAppendPassword(packet, pwd);
+                }
+            }
+
+            const blob = new Blob([packet], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'programa.bin';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            alert(`Erro ao gerar BIN:\n${e.message}`);
+        }
+    }
+
+    // ===== Enviar BIN para PLC (carrega arquivo + verifica senha + envia) =====
+    async sendBinToPlc() {
+        if (!this.activeComm) {
+            alert("Conecte-se ao PLC (Serial ou BLE) primeiro!");
+            return;
+        }
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.bin';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            let data;
+            try {
+                const buf = await file.arrayBuffer();
+                data = new Uint8Array(buf);
+            } catch (err) {
+                alert(`Erro ao ler arquivo: ${err.message}`);
+                return;
+            }
+
+            // 1) Se arquivo já tem senha → verifica antes de acessar conteúdo
+            if (this._binHasPassword(data)) {
+                const pwd = prompt("Arquivo protegido por senha.\nDigite a senha:");
+                if (!pwd) return;
+                const pwdBytes = data.slice(data.length - 32);
+                if (!this._binVerifyPassword(pwdBytes, pwd)) {
+                    alert("Senha incorreta!");
+                    return;
+                }
+            }
+
+            // 2) Valida magic bytes AA 55 (no pacote base sem senha)
+            const { raw } = this._binStripPassword(data);
+            if (raw.length < 6 || raw[0] !== 0xAA || raw[1] !== 0x55) {
+                alert("Arquivo inválido!\nMagic bytes 0xAA 0x55 não encontrados.");
+                return;
+            }
+
+            // 3) Valida checksum XOR (apenas sobre o pacote base)
+            let calcCs = 0;
+            for (let i = 0; i < raw.length - 1; i++) calcCs ^= raw[i];
+            if (calcCs !== raw[raw.length - 1]) {
+                const cont = confirm(
+                    `Checksum diverge!\nCalculado: 0x${calcCs.toString(16).toUpperCase()}\n` +
+                    `Arquivo: 0x${raw[raw.length - 1].toString(16).toUpperCase()}\n\nEnviar mesmo assim?`
+                );
+                if (!cont) return;
+            }
+
+            // 4) Pergunta se deseja enviar com ou sem senha
+            let sendData = raw; // começa com pacote base (sem senha)
+            if (await this._confirmSimNao("Deseja enviar o programa com proteção de senha?")) {
+                const pwd = prompt("Digite a senha (máx. 32 caracteres):");
+                if (pwd) {
+                    sendData = this._binAppendPassword(raw, pwd);
+                }
+            }
+
+            // 5) Envia
+            try {
+                this.logComm(`> Enviando BIN: ${sendData.length} bytes (${file.name})${sendData.length > raw.length ? ' [com senha]' : ''}...`);
+                await this.sendCommCommand(sendData, "BIN");
+                this.logComm(`> BIN enviado com sucesso.`);
+                this.logComm(`> Pressione ▶️ (F5) para iniciar o PLC.`);
+                alert("BIN enviado!\n\nPressione ▶️ (F5) para iniciar o PLC.");
+            } catch (err) {
+                this.logComm(`[ERRO] Falha ao enviar BIN: ${err.message}`);
+                alert(`Erro ao enviar BIN:\n${err.message}`);
+            }
+        };
+        input.click();
     }
 }
 

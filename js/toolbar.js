@@ -24,6 +24,9 @@ class Toolbar {
                     { type: 'separator' },
                     { label: '📤 Exportar JSON', action: () => this.app.exportJSON() },
                     { label: '📥 Importar JSON', action: () => this.app.importJSON() },
+                    { type: 'separator' },
+                    { label: '💿 Salvar BIN', action: () => this.app.saveBin() },
+                    { label: '📂 Enviar BIN para PLC', action: () => this.app.sendBinToPlc() },
                 ]
             },
             {

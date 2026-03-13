@@ -431,42 +431,95 @@ class PLCSerializer {
         // Serializa CMPs
         const operatorMap = { '==': 0x00, '!=': 0x01, '>': 0x02, '<': 0x03, '>=': 0x04, '<=': 0x05, 'AND': 0x06, 'OU': 0x07, 'OR': 0x07, 'XOR': 0x08 };
 
+        // Mapa de nome de variável → índice (igual ao Python: resolve 'VAR0','V0',etc.)
+        const varNameToIdx = {};
+        for (let vi = 0; vi < variables.length; vi++) {
+            const vn = (variables[vi].name || `VAR${vi}`).trim().toUpperCase();
+            let ri = vi;
+            if (vn.startsWith('VAR') && !isNaN(parseInt(vn.slice(3)))) ri = parseInt(vn.slice(3));
+            varNameToIdx[vn] = ri;
+            varNameToIdx[`VAR${ri}`] = ri;
+            varNameToIdx[`V${ri}`] = ri;
+        }
+
+        const resolveVarIdx = (token) => {
+            if (typeof token !== 'string') return null;
+            const k = token.trim().toUpperCase();
+            if (k in varNameToIdx) return varNameToIdx[k];
+            if (k.startsWith('V') && !isNaN(parseInt(k.slice(1)))) return parseInt(k.slice(1));
+            return null;
+        };
+
+        // Parse de source (igual ao Python serialize_compare_elements)
+        const parseCmpSrc = (src) => {
+            let type = 0, val = 0;
+            if (typeof src !== 'string') { val = parseInt(src) || 0; return { type, val }; }
+            const su = src.toUpperCase();
+            if (su.startsWith('MATH') && !isNaN(parseInt(src.slice(4)))) { type = 3; val = parseInt(src.slice(4)); }
+            else if (src.startsWith('M') && src.length > 1 && !isNaN(parseInt(src.slice(1))) && !su.startsWith('MAT')) { type = 3; val = parseInt(src.slice(1)); }
+            else if ((su.startsWith('CTU') || su.startsWith('CTD')) && !isNaN(parseInt(src.slice(3)))) { type = 1; val = parseInt(src.slice(3)); }
+            else if (src.startsWith('C') && !isNaN(parseInt(src.slice(1)))) { type = 1; val = parseInt(src.slice(1)); }
+            else if ((su.startsWith('TON') || su.startsWith('TOF') || su.startsWith('TOFF')) && !isNaN(parseInt(src.slice(su.startsWith('TOFF') ? 4 : 3)))) { type = 2; val = parseInt(src.slice(su.startsWith('TOFF') ? 4 : 3)); }
+            else if (src.startsWith('T') && !isNaN(parseInt(src.slice(1)))) { type = 2; val = parseInt(src.slice(1)); }
+            else if (su.startsWith('AN') && !isNaN(parseInt(src.slice(2)))) { type = 0x0A; val = parseInt(src.slice(2)); }
+            else if (su.startsWith('POT') && !isNaN(parseInt(src.slice(3)))) { type = 0x0C; val = 4; }
+            else if (su.startsWith('JOY') && !isNaN(parseInt(src.slice(3)))) { type = 0x0D; val = parseInt(src.slice(3)); }
+            else if (su.startsWith('RTC')) { type = 0x05; val = 0; }
+            else {
+                const vi = resolveVarIdx(src);
+                if (vi !== null) { type = 4; val = vi; }
+                else { val = parseInt(src) || 0; }
+            }
+            return { type, val };
+        };
+
+        const autoDetectSrcA = (elem) => {
+            const ex = parseFloat(elem.x || 0);
+            const ey = parseFloat(elem.y || 0);
+            const validTypes = ['counter','timer','math','variable','analog_input','potentiometer','rtc','joystick'];
+            let prev = null;
+            for (const e of ladderElements) {
+                if (e === elem) continue;
+                if (!validTypes.includes(e.type)) continue;
+                const eex = parseFloat(e.x || 0), eey = parseFloat(e.y || 0);
+                if (eey === ey && eex < ex) {
+                    if (!prev || eex > parseFloat(prev.x || 0)) prev = e;
+                }
+            }
+            if (!prev) return '';
+            const ptype = prev.type, pname = prev.name || '';
+            if (ptype === 'variable') {
+                const pu = pname.toUpperCase();
+                if (pu.startsWith('VAR') && !isNaN(parseInt(pname.slice(3)))) return `V${parseInt(pname.slice(3))}`;
+                return pname;
+            }
+            return pname; // timer/counter/math/analog/pot/joy/rtc: usa o name diretamente
+        };
+
         for (let i = 0; i < compares.length; i++) {
             let cmp = compares[i];
             let opStr = cmp.operator || '==';
             let opByte = operatorMap[opStr] || 0x00;
             let rungIndex = this._getElementRungIndex(cmp, rungs);
-            let srcA = cmp.source_a || '0';
+            let srcA = cmp.source_a || '';
             let srcB = cmp.preset || '0';
-            
-            // Auto detect from left omitted for brevity, we assume clean srcA and srcB inputs mapping
-            let typeA = 0; let valA = parseInt(srcA) || 0;
-            let typeB = 0; let valB = parseInt(srcB) || 0;
-            
-            if (typeof srcA === 'string') {
-                if (srcA.startsWith('C') && !isNaN(parseInt(srcA.slice(1)))) { typeA = 1; valA = parseInt(srcA.slice(1)); }
-                else if (srcA.startsWith('T') && !isNaN(parseInt(srcA.slice(1)))) { typeA = 2; valA = parseInt(srcA.slice(1)); }
-                else if (srcA.startsWith('M') && !isNaN(parseInt(srcA.slice(1)))) { typeA = 3; valA = parseInt(srcA.slice(1)); }
-                else if (srcA.startsWith('V') && !isNaN(parseInt(srcA.slice(1)))) { typeA = 4; valA = parseInt(srcA.slice(1)); }
-                else if (srcA.startsWith('POT') && !isNaN(parseInt(srcA.slice(3)))) { typeA = 0x0C; valA = 4; } // Default I0.4
-                else if (srcA.startsWith('JOY') && !isNaN(parseInt(srcA.slice(3)))) { typeA = 0x0D; valA = parseInt(srcA.slice(3)); }
-            }
-            if (typeof srcB === 'string') {
-                if (srcB.startsWith('C') && !isNaN(parseInt(srcB.slice(1)))) { typeB = 1; valB = parseInt(srcB.slice(1)); }
-                else if (srcB.startsWith('T') && !isNaN(parseInt(srcB.slice(1)))) { typeB = 2; valB = parseInt(srcB.slice(1)); }
-                else if (srcB.startsWith('V') && !isNaN(parseInt(srcB.slice(1)))) { typeB = 4; valB = parseInt(srcB.slice(1)); }
-            }
 
-            payload.push(0x06); // Element type
+            // Auto-detect source_a: escaneia elemento à esquerda (igual ao Python)
+            if (!srcA || srcA === '0') srcA = autoDetectSrcA(cmp);
+
+            const pA = parseCmpSrc(srcA);
+            const pB = parseCmpSrc(srcB);
+
+            payload.push(0x06);
             payload.push(i & 0xFF);
             payload.push(opByte);
             payload.push(rungIndex & 0xFF);
-            payload.push(valA & 0xFF);
-            payload.push((valA >> 8) & 0xFF);
-            payload.push(valB & 0xFF);
-            payload.push((valB >> 8) & 0xFF);
-            payload.push(typeA);
-            payload.push(typeB);
+            payload.push(pA.val & 0xFF);
+            payload.push((pA.val >> 8) & 0xFF);
+            payload.push(pB.val & 0xFF);
+            payload.push((pB.val >> 8) & 0xFF);
+            payload.push(pA.type);
+            payload.push(pB.type);
         }
 
         // Serializa MATHs

@@ -204,10 +204,11 @@ class Toolbar {
             // Tap/Click to Add (Para Mobile e usabilidade rápida)
             btn.addEventListener('click', () => {
                 const isBranch = (compType === 'branch');
-                let targetX = 100;
-                let targetY = 80;
-
                 const app = this.app;
+                
+                // Base target relative to canvas margins
+                let targetX = app.ladderCanvas.LEFT_MARGIN + 15;
+                let targetY = 80;
                 if (app.selectedElement && !isBranch) {
                     // Adiciona logo após o componente selecionado
                     targetX = app.selectedElement.x + 80;

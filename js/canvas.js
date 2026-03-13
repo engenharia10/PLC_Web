@@ -25,6 +25,11 @@ class LadderCanvas {
             const rect = this.canvas.parentElement.getBoundingClientRect();
             this.canvas.width = rect.width * this.dpr;
             this.canvas.height = rect.height * this.dpr;
+            
+            // Ajusta margens nos celulares para não desperdiçar espaço com trilhos azuis muito afastados
+            const isMobile = window.innerWidth <= 600;
+            this.LEFT_MARGIN = isMobile ? 35 : 50;
+            this.RIGHT_MARGIN = isMobile ? 15 : 20;
             this.canvas.style.width = rect.width + 'px';
             this.canvas.style.height = rect.height + 'px';
             this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);

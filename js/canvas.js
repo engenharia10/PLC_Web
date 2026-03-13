@@ -389,8 +389,9 @@ class LadderCanvas {
                 return e.y;
             }));
         }
-        const totalH = Math.max(maxY + 200, this.height);
-        this.maxScrollY = Math.max(0, (maxY + 200) - this.height);
+        // Garante que o usuário de celular sempre consiga rolar pelo menos 600px extras pra baixo
+        this.maxScrollY = Math.max(800, (maxY + 600) - this.height);
+        const totalH = Math.max(maxY + 200, this.scrollY + this.height);
 
         ctx.save();
         ctx.translate(0, -this.scrollY);

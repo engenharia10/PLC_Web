@@ -112,7 +112,16 @@ class Toolbar {
                 e.stopPropagation();
                 const isOpen = menuItem.classList.contains('open');
                 this._closeAllMenus();
-                if (!isOpen) menuItem.classList.add('open');
+                if (!isOpen) {
+                    menuItem.classList.add('open');
+                    
+                    // Como a menubar agora tem overflow-x, dropdowns com position absolute serão cortados!
+                    // Fixamos o dropdown e usamos Javascript para achar a coordenada XYZ na tela
+                    const rect = trigger.getBoundingClientRect();
+                    dropdown.style.position = 'fixed';
+                    dropdown.style.top = rect.bottom + 'px';
+                    dropdown.style.left = rect.left + 'px';
+                }
             };
 
             menubar.appendChild(menuItem);

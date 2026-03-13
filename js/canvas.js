@@ -422,13 +422,6 @@ class LadderCanvas {
 
         ctx.restore();
 
-        // [DEBUG HUD] Painel fixo na tela para rastreio de touch
-        ctx.fillStyle = 'yellow';
-        ctx.font = 'bold 16px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(`ScrollY: ${Math.round(this.scrollY)} / MAX: ${Math.round(this.maxScrollY)}`, 10, 30);
-        ctx.fillText(`Panning? ${this.isPanning}`, 10, 55);
-
         // Scrollbar visual (sobre o canvas, fora do translate)
         this._drawScrollbar();
     }

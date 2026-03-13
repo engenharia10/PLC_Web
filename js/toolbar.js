@@ -182,7 +182,12 @@ class Toolbar {
 
             const btn = document.createElement('button');
             btn.className = 'component-btn';
-            btn.setAttribute('draggable', 'true');
+            
+            // Apenas habilita Drag HTML5 (Desktop). No Mobile, draggable bloqueia scroll e clicks nativos
+            if (!('ontouchstart' in window) || navigator.maxTouchPoints === 0) {
+                btn.setAttribute('draggable', 'true');
+            }
+            
             btn.dataset.compType = compType;
             btn.innerHTML = `<span class="comp-icon">${data.icon}</span><span class="comp-label">${shortLabel}</span>`;
 

@@ -64,6 +64,8 @@ class LadderCanvas {
     resizeElement = null;
     dragOffsetX = 0;
     dragOffsetY = 0;
+    startX = 0;
+    startY = 0;
 
     _onWheel(e) {
         e.preventDefault();
@@ -160,6 +162,8 @@ class LadderCanvas {
             this.dragElement = found;
             this.dragOffsetX = pos.x - found.x;
             this.dragOffsetY = pos.y - found.y;
+            this.startX = pos.x;
+            this.startY = pos.y;
             this._wasDragged = false;
         } else {
             app.selectedElement = null;
@@ -182,11 +186,18 @@ class LadderCanvas {
 
         // Handle dragging elements
         if (this.isDragging && this.dragElement) {
-            this._wasDragged = true;
-            const grid = 10;
-            const app = this.app;
-            this.dragElement.x = Math.round((pos.x - this.dragOffsetX) / grid) * grid;
-            this.dragElement.y = Math.round((pos.y - this.dragOffsetY) / grid) * grid;
+            // Adicionado threshold de 5px para não registrar o leve tremor do dedo "touch" como arraste
+            if (!this._wasDragged) {
+                if (Math.abs(pos.x - this.startX) > 5 || Math.abs(pos.y - this.startY) > 5) {
+                    this._wasDragged = true;
+                }
+            }
+
+            if (this._wasDragged) {
+                const grid = 10;
+                const app = this.app;
+                this.dragElement.x = Math.round((pos.x - this.dragOffsetX) / grid) * grid;
+                this.dragElement.y = Math.round((pos.y - this.dragOffsetY) / grid) * grid;
 
             // Snap to branch_y (prioridade sobre rung), igual ao Python
             if (this.dragElement.type !== 'branch') {
@@ -228,7 +239,8 @@ class LadderCanvas {
                     this.dragElement.rung_y = closestRung.y;
                 }
             }
-
+            
+            }
             this.render();
             return;
         }

@@ -644,6 +644,10 @@ html, body {
     display: none;
 }
 
+#mqtt-monitor-window.hidden {
+    display: none !important;
+}
+
 #monitor-titlebar {
     background: #1e293b;
     padding: 8px 14px;

@@ -143,40 +143,41 @@
                 <button id="mqtt-monitor-close" style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:0 4px;">×</button>
             </div>
         </div>
-        <div style="padding:10px;overflow-y:auto;flex:1;">
+        <div style="padding:10px;overflow-y:hidden;flex:1;display:flex;flex-direction:column;gap:8px;">
 
             <!-- I/O Row -->
-            <div style="display:flex;gap:8px;margin-bottom:8px;">
-                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;">
+            <div style="display:flex;gap:8px;flex:1;min-height:0;">
+                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;display:flex;flex-direction:column;min-height:0;">
                     <div style="color:#64748b;font-size:11px;margin-bottom:6px;">ENTRADAS</div>
-                    <div id="mqtt-inputs-grid" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                    <div id="mqtt-inputs-grid" style="display:flex;flex-wrap:wrap;gap:4px;overflow-y:auto;flex:1;align-content:flex-start;"></div>
                 </div>
-                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;">
+                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;display:flex;flex-direction:column;min-height:0;">
                     <div style="color:#64748b;font-size:11px;margin-bottom:6px;">SAÍDAS</div>
-                    <div id="mqtt-outputs-grid" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                    <div id="mqtt-outputs-grid" style="display:flex;flex-wrap:wrap;gap:4px;overflow-y:auto;flex:1;align-content:flex-start;"></div>
                 </div>
             </div>
 
-            <!-- Timers / Counters / Vars -->
-            <div style="display:flex;gap:8px;margin-bottom:8px;">
-                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;min-height:40px;">
+            <!-- Timers / Counters -->
+            <div style="display:flex;gap:8px;flex:1;min-height:0;">
+                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;display:flex;flex-direction:column;min-height:0;">
                     <div style="color:#64748b;font-size:11px;margin-bottom:4px;">TON / TOFF (ms)</div>
-                    <div id="mqtt-timers-row" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                    <div id="mqtt-timers-row" style="display:flex;flex-wrap:wrap;gap:4px;overflow-y:auto;flex:1;align-content:flex-start;"></div>
                 </div>
-                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;min-height:40px;">
+                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;display:flex;flex-direction:column;min-height:0;">
                     <div style="color:#64748b;font-size:11px;margin-bottom:4px;">CTU / CTD</div>
-                    <div id="mqtt-counters-row" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                    <div id="mqtt-counters-row" style="display:flex;flex-wrap:wrap;gap:4px;overflow-y:auto;flex:1;align-content:flex-start;"></div>
                 </div>
             </div>
 
-            <div style="display:flex;gap:8px;">
-                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;min-height:40px;">
+            <!-- Vars / CMP -->
+            <div style="display:flex;gap:8px;flex:1;min-height:0;">
+                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;display:flex;flex-direction:column;min-height:0;">
                     <div style="color:#64748b;font-size:11px;margin-bottom:4px;">VARIÁVEIS</div>
-                    <div id="mqtt-vars-row" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                    <div id="mqtt-vars-row" style="display:flex;flex-wrap:wrap;gap:4px;overflow-y:auto;flex:1;align-content:flex-start;"></div>
                 </div>
-                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;min-height:40px;">
+                <div style="flex:1;background:#0f172a;border-radius:6px;padding:8px;display:flex;flex-direction:column;min-height:0;">
                     <div style="color:#64748b;font-size:11px;margin-bottom:4px;">CMP / MATH</div>
-                    <div id="mqtt-cmp-row" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+                    <div id="mqtt-cmp-row" style="display:flex;flex-wrap:wrap;gap:4px;overflow-y:auto;flex:1;align-content:flex-start;"></div>
                 </div>
             </div>
 

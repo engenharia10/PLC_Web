@@ -911,6 +911,7 @@ class PLCApp {
 
         this.mqttComm.onStateUpdate = (state) => {
             this._renderMQTTState(state);
+            this._applyMQTTToCanvas(state);
         };
 
         this.mqttComm.onData = (bytes) => {
@@ -1017,6 +1018,68 @@ class PLCApp {
             if (rtcEl && rtcEl.textContent !== '🕐 ' + s.rtc)
                 rtcEl.textContent = '🕐 ' + s.rtc;
         }
+    }
+
+    _applyMQTTToCanvas(s) {
+        let changed = false;
+
+        for (const el of this.elements) {
+            let active = false;
+            let liveVal = undefined;
+            const name = (el.name || '').toUpperCase();
+
+            if (el.type === 'contact' || el.type === 'coil') {
+                // "I0.X" ou "IX" → bit X de inputs
+                let m = name.match(/^I\d+\.(\d+)$/) || name.match(/^I(\d+)$/);
+                if (m) active = !!((s.inputs >> parseInt(m[1])) & 1);
+
+                // "Q0.X" ou "QX" → bit X de outputs
+                m = name.match(/^Q\d+\.(\d+)$/) || name.match(/^Q(\d+)$/);
+                if (m) active = !!((s.outputs >> parseInt(m[1])) & 1);
+            }
+
+            if (el.type === 'timer') {
+                const idx = parseInt((name.match(/(\d+)$/) || [])[1] ?? '0');
+                const ton  = s.timers_ton[idx];
+                const toff = s.timers_toff[idx];
+                const val  = ton !== undefined ? ton : toff;
+                if (val !== undefined) { liveVal = val; active = val > 0; }
+            }
+
+            if (el.type === 'counter') {
+                const idx = parseInt((name.match(/(\d+)$/) || [])[1] ?? '0');
+                const cu = s.ctu[idx];
+                const cd = s.ctd[idx];
+                const val = cu !== undefined ? cu : cd;
+                if (val !== undefined) { liveVal = val; active = val > 0; }
+            }
+
+            if (el.type === 'variable') {
+                const idx = parseInt((name.match(/(\d+)$/) || [])[1] ?? '0');
+                const val = s.vars[idx];
+                if (val !== undefined) { liveVal = val; active = val !== 0; }
+            }
+
+            if (el.type === 'compare') {
+                const idx = parseInt((name.match(/(\d+)$/) || [])[1] ?? '0');
+                const val = s.cmp[idx];
+                if (val !== undefined) { liveVal = val; active = val !== 0; }
+            }
+
+            if (el.type === 'math') {
+                const idx = parseInt((name.match(/(\d+)$/) || [])[1] ?? '0');
+                const val = s.math[idx];
+                if (val !== undefined) { liveVal = val; }
+            }
+
+            if (el._active !== active || el._liveVal !== liveVal) {
+                el._active  = active;
+                el._liveVal = liveVal;
+                changed = true;
+            }
+        }
+
+        if (changed) this.ladderCanvas.render();
     }
 }
 

@@ -653,24 +653,34 @@ class LadderCanvas {
             if (el.type === 'branch') continue;
             const x = el.x, y = el.y, hw = COMPONENT_HALF_WIDTH;
 
-            ctx.fillStyle = canvasBg;
-            ctx.strokeStyle = iconColor;
-            ctx.lineWidth = 1;
+            // Fundo: verde escuro se ativo, normal caso contrário
+            ctx.fillStyle = el._active ? '#052e16' : canvasBg;
+            ctx.strokeStyle = el._active ? '#22c55e' : iconColor;
+            ctx.lineWidth = el._active ? 2 : 1;
             ctx.fillRect(x - hw, y - 15, hw * 2, 30);
             ctx.strokeRect(x - hw, y - 15, hw * 2, 30);
 
             const icon = getElementIcon(el);
-            ctx.fillStyle = iconColor;
+            ctx.fillStyle = el._active ? '#4ade80' : iconColor;
             ctx.font = 'bold 13px "Courier New", Courier, monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(icon, x, y - 1);
 
-            ctx.fillStyle = nameColor;
+            ctx.fillStyle = el._active ? '#4ade80' : nameColor;
             ctx.font = 'bold 9px "Segoe UI"';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
             ctx.fillText(el.name, x, y + 17);
+
+            // Valor live (timer/counter/var) abaixo do elemento
+            if (el._liveVal !== undefined) {
+                ctx.fillStyle = '#38bdf8';
+                ctx.font = '8px "Segoe UI"';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(String(el._liveVal), x, y + 28);
+            }
         }
     }
 

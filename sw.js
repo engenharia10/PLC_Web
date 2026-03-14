@@ -3,12 +3,13 @@
  * Estratégia: Cache-First com fallback para rede
  */
 
-const CACHE_NAME = 'plc-editor-v23';
+const CACHE_NAME = 'plc-editor-v24';
 
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './css/styles.css',
+    './js/mqtt_comm.js',
     './js/plc_protocol.js',
     './js/serial_comm.js',
     './js/ble_comm.js',

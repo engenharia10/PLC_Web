@@ -36,10 +36,12 @@ class PLCApp {
         // Communication
         this.serialComm = typeof SerialComm !== 'undefined' ? new SerialComm() : null;
         this.bleComm = typeof BLEComm !== 'undefined' ? new BLEComm() : null;
+        this.mqttComm = typeof MQTTComm !== 'undefined' ? new MQTTComm() : null;
         this.plcProtocol = typeof PLCProtocol !== 'undefined' ? new PLCProtocol() : null;
         this.serializer = typeof PLCSerializer !== 'undefined' ? new PLCSerializer() : null;
-        this.activeComm = null; // Can be 'serial' or 'ble'
+        this.activeComm = null; // Can be 'serial', 'ble' or 'mqtt'
         this._setupCommunication();
+        this._setupMQTT();
 
         // Initial rung
         this.addRung();
@@ -333,27 +335,27 @@ class PLCApp {
         const modal = document.getElementById('comm-modal');
         const closeBtn = document.getElementById('comm-close-btn');
         const tabSerial = document.getElementById('tab-serial');
-        const tabBle = document.getElementById('tab-ble');
+        const tabBle   = document.getElementById('tab-ble');
+        const tabMqtt  = document.getElementById('tab-mqtt');
         const panelSerial = document.getElementById('panel-serial');
-        const panelBle = document.getElementById('panel-ble');
+        const panelBle    = document.getElementById('panel-ble');
+        const panelMqtt   = document.getElementById('panel-mqtt');
+
+        const showTab = (active, panels) => {
+            [tabSerial, tabBle, tabMqtt].forEach(t => t.classList.remove('active'));
+            [panelSerial, panelBle, panelMqtt].forEach(p => { p.style.display = 'none'; p.classList.remove('active'); });
+            active.classList.add('active');
+            panels.style.display = 'block';
+        };
 
         // Close modal
         closeBtn.onclick = () => this.hideCommModal();
         window.onclick = (e) => { if (e.target === modal) this.hideCommModal(); };
 
         // Tabs
-        tabSerial.onclick = () => {
-            tabSerial.classList.add('active');
-            tabBle.classList.remove('active');
-            panelSerial.style.display = 'block';
-            panelBle.style.display = 'none';
-        };
-        tabBle.onclick = () => {
-            tabBle.classList.add('active');
-            tabSerial.classList.remove('active');
-            panelBle.style.display = 'block';
-            panelSerial.style.display = 'none';
-        };
+        tabSerial.onclick = () => showTab(tabSerial, panelSerial);
+        tabBle.onclick    = () => showTab(tabBle, panelBle);
+        tabMqtt.onclick   = () => showTab(tabMqtt, panelMqtt);
 
         // Monitor: fechar
         document.getElementById('monitor-close-btn').onclick = () => {
@@ -559,6 +561,8 @@ class PLCApp {
                 await this.serialComm.send(packetData);
             } else if (this.activeComm === 'ble' && this.bleComm.isConnected) {
                 await this.bleComm.send(packetData);
+            } else if (this.activeComm === 'mqtt' && this.mqttComm.isConnected) {
+                this.mqttComm.send(packetData);
             }
             this.logComm(`[OK] ${label} enviado com sucesso.`);
         } catch (e) {
@@ -836,6 +840,146 @@ class PLCApp {
             }
         };
         input.click();
+    }
+
+    // ===== MQTT =====
+    _setupMQTT() {
+        if (!this.mqttComm) return;
+
+        const statusEl = document.getElementById('mqtt-status-msg');
+        const connBtn  = document.getElementById('mqtt-connect-btn');
+        const discBtn  = document.getElementById('mqtt-disconnect-btn');
+        const commInd  = document.getElementById('comm-status-indicator');
+
+        this.mqttComm.onLog = (msg) => this.logComm(`[MQTT] ${msg}`);
+
+        this.mqttComm.onConnected = () => {
+            connBtn.disabled = true;
+            discBtn.disabled = false;
+            if (statusEl) statusEl.textContent = '✅ Conectado — ' + this.mqttComm.deviceId;
+            if (commInd) commInd.textContent = '☁️ MQTT Online';
+            this.activeComm = 'mqtt';
+            // Abre monitor MQTT
+            document.getElementById('mqtt-monitor-window').classList.remove('hidden');
+            this.hideCommModal();
+            // Arrastar monitor MQTT
+            this._makeDraggable(
+                document.getElementById('mqtt-monitor-window'),
+                document.getElementById('mqtt-monitor-titlebar')
+            );
+        };
+
+        this.mqttComm.onDisconnected = () => {
+            connBtn.disabled = false;
+            discBtn.disabled = true;
+            if (statusEl) statusEl.textContent = '🔌 Desconectado';
+            if (commInd) commInd.textContent = '🔌 Desconectado';
+            if (this.activeComm === 'mqtt') this.activeComm = null;
+        };
+
+        this.mqttComm.onStateUpdate = (state) => {
+            this._renderMQTTState(state);
+        };
+
+        this.mqttComm.onData = (bytes) => {
+            this.handleCommRX(bytes);
+        };
+
+        connBtn.onclick = () => {
+            const host = document.getElementById('mqtt-host').value.trim();
+            const user = document.getElementById('mqtt-user').value.trim();
+            const pass = document.getElementById('mqtt-pass').value.trim();
+            const id   = document.getElementById('mqtt-device-id').value.trim();
+            if (!host || !user || !id) {
+                if (statusEl) statusEl.textContent = '⚠️ Preencha Host, Usuário e Device ID';
+                return;
+            }
+            if (statusEl) statusEl.textContent = '⏳ Conectando...';
+            this.mqttComm.connect(host, user, pass, id);
+        };
+
+        discBtn.onclick = () => {
+            this.mqttComm.disconnect();
+            document.getElementById('mqtt-monitor-window').classList.add('hidden');
+        };
+
+        document.getElementById('mqtt-monitor-close').onclick = () => {
+            document.getElementById('mqtt-monitor-window').classList.add('hidden');
+        };
+    }
+
+    _renderMQTTState(s) {
+        const N_IO = 32;
+
+        // Helper: badge colorido
+        const badge = (label, val, on) =>
+            `<span title="${label}" style="display:inline-flex;align-items:center;justify-content:center;min-width:28px;padding:2px 5px;border-radius:4px;font-size:11px;font-family:monospace;background:${on ? '#166534' : '#1e293b'};color:${on ? '#4ade80' : '#475569'};border:1px solid ${on ? '#16a34a' : '#334155'}">${label}</span>`;
+
+        const valBadge = (label, val) =>
+            `<span title="${label}=${val}" style="display:inline-flex;gap:2px;align-items:center;padding:2px 6px;border-radius:4px;font-size:11px;font-family:monospace;background:#1e293b;color:#38bdf8;border:1px solid #334155"><span style="color:#64748b">${label}:</span>${val}</span>`;
+
+        // Entradas
+        const inEl = document.getElementById('mqtt-inputs-grid');
+        if (inEl) {
+            let h = '';
+            for (let i = 0; i < N_IO; i++) {
+                const on = (s.inputs >> i) & 1;
+                if (on || i < 16) h += badge(`I${i}`, on, on);
+            }
+            inEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
+        }
+
+        // Saídas
+        const outEl = document.getElementById('mqtt-outputs-grid');
+        if (outEl) {
+            let h = '';
+            for (let i = 0; i < N_IO; i++) {
+                const on = (s.outputs >> i) & 1;
+                if (on || i < 16) h += badge(`Q${i}`, on, on);
+            }
+            outEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
+        }
+
+        // Timers TON + TOFF
+        const tmEl = document.getElementById('mqtt-timers-row');
+        if (tmEl) {
+            let h = '';
+            s.timers_ton.forEach((v, i)  => { if (v !== undefined) h += valBadge(`N${i}`, v); });
+            s.timers_toff.forEach((v, i) => { if (v !== undefined) h += valBadge(`F${i}`, v); });
+            tmEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
+        }
+
+        // Contadores CTU + CTD
+        const cntEl = document.getElementById('mqtt-counters-row');
+        if (cntEl) {
+            let h = '';
+            s.ctu.forEach((v, i) => { if (v !== undefined) h += valBadge(`U${i}`, v); });
+            s.ctd.forEach((v, i) => { if (v !== undefined) h += valBadge(`D${i}`, v); });
+            cntEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
+        }
+
+        // Variáveis
+        const varEl = document.getElementById('mqtt-vars-row');
+        if (varEl) {
+            let h = '';
+            s.vars.forEach((v, i) => { if (v !== undefined) h += valBadge(`V${i}`, v); });
+            varEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
+        }
+
+        // CMP + MATH
+        const cmpEl = document.getElementById('mqtt-cmp-row');
+        if (cmpEl) {
+            let h = '';
+            s.cmp.forEach((v, i)  => { if (v !== undefined) h += valBadge(`K${i}`, v); });
+            s.math.forEach((v, i) => { if (v !== undefined) h += valBadge(`M${i}`, v); });
+            cmpEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
+        }
+
+        // RTC
+        if (s.rtc) {
+            const rtcEl = document.getElementById('mqtt-monitor-rtc');
+            if (rtcEl) rtcEl.textContent = '🕐 ' + s.rtc;
+        }
     }
 }
 

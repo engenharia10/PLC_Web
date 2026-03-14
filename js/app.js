@@ -941,76 +941,81 @@ class PLCApp {
     }
 
     _renderMQTTState(s) {
-        const N_IO = 32;
+        if (!this._mqttDom) this._mqttDom = {};
+        const D = this._mqttDom;
 
-        // Helper: badge colorido
-        const badge = (label, val, on) =>
-            `<span title="${label}" style="display:inline-flex;align-items:center;justify-content:center;min-width:28px;padding:2px 5px;border-radius:4px;font-size:11px;font-family:monospace;background:${on ? '#166534' : '#1e293b'};color:${on ? '#4ade80' : '#475569'};border:1px solid ${on ? '#16a34a' : '#334155'}">${label}</span>`;
-
-        const valBadge = (label, val) =>
-            `<span title="${label}=${val}" style="display:inline-flex;gap:2px;align-items:center;padding:2px 6px;border-radius:4px;font-size:11px;font-family:monospace;background:#1e293b;color:#38bdf8;border:1px solid #334155"><span style="color:#64748b">${label}:</span>${val}</span>`;
-
-        // Entradas
-        const inEl = document.getElementById('mqtt-inputs-grid');
-        if (inEl) {
-            let h = '';
-            for (let i = 0; i < N_IO; i++) {
-                const on = (s.inputs >> i) & 1;
-                if (on || i < 16) h += badge(`I${i}`, on, on);
+        // --- helpers ---
+        const _setIO = (container, prefix, bitmask, count) => {
+            if (!container) return;
+            for (let i = 0; i < count; i++) {
+                const on = (bitmask >> i) & 1;
+                const key = prefix + i;
+                let el = D[key];
+                if (!el) {
+                    el = document.createElement('span');
+                    el.title = key;
+                    el.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;min-width:28px;padding:2px 5px;border-radius:4px;font-size:11px;font-family:monospace;border:1px solid #334155';
+                    el.textContent = key;
+                    container.appendChild(el);
+                    D[key] = el;
+                }
+                const wasOn = el._on;
+                if (wasOn !== on) {
+                    el._on = on;
+                    el.style.background = on ? '#166534' : '#1e293b';
+                    el.style.color      = on ? '#4ade80' : '#475569';
+                    el.style.borderColor = on ? '#16a34a' : '#334155';
+                }
             }
-            inEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
-        }
+        };
 
-        // Saídas
-        const outEl = document.getElementById('mqtt-outputs-grid');
-        if (outEl) {
-            let h = '';
-            for (let i = 0; i < N_IO; i++) {
-                const on = (s.outputs >> i) & 1;
-                if (on || i < 16) h += badge(`Q${i}`, on, on);
+        const _setVal = (container, key, val) => {
+            if (!container || val === undefined) return;
+            let el = D['v_' + key];
+            if (!el) {
+                el = document.createElement('span');
+                el.style.cssText = 'display:inline-flex;gap:2px;align-items:center;padding:2px 6px;border-radius:4px;font-size:11px;font-family:monospace;background:#1e293b;color:#38bdf8;border:1px solid #334155';
+                const lbl = document.createElement('span');
+                lbl.style.color = '#64748b';
+                lbl.textContent = key + ':';
+                el._valNode = document.createTextNode(String(val));
+                el.appendChild(lbl);
+                el.appendChild(el._valNode);
+                container.appendChild(el);
+                D['v_' + key] = el;
+            } else if (el._valNode.nodeValue !== String(val)) {
+                el._valNode.nodeValue = String(val);
             }
-            outEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
-        }
+        };
 
-        // Timers TON + TOFF
+        // --- I/O (fixo 16 bits visíveis) ---
+        _setIO(document.getElementById('mqtt-inputs-grid'),  'I', s.inputs,  16);
+        _setIO(document.getElementById('mqtt-outputs-grid'), 'Q', s.outputs, 16);
+
+        // --- Timers ---
         const tmEl = document.getElementById('mqtt-timers-row');
-        if (tmEl) {
-            let h = '';
-            s.timers_ton.forEach((v, i)  => { if (v !== undefined) h += valBadge(`N${i}`, v); });
-            s.timers_toff.forEach((v, i) => { if (v !== undefined) h += valBadge(`F${i}`, v); });
-            tmEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
-        }
+        s.timers_ton.forEach( (v, i) => _setVal(tmEl,  `N${i}`, v));
+        s.timers_toff.forEach((v, i) => _setVal(tmEl,  `F${i}`, v));
 
-        // Contadores CTU + CTD
+        // --- Contadores ---
         const cntEl = document.getElementById('mqtt-counters-row');
-        if (cntEl) {
-            let h = '';
-            s.ctu.forEach((v, i) => { if (v !== undefined) h += valBadge(`U${i}`, v); });
-            s.ctd.forEach((v, i) => { if (v !== undefined) h += valBadge(`D${i}`, v); });
-            cntEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
-        }
+        s.ctu.forEach((v, i) => _setVal(cntEl, `U${i}`, v));
+        s.ctd.forEach((v, i) => _setVal(cntEl, `D${i}`, v));
 
-        // Variáveis
+        // --- Variáveis ---
         const varEl = document.getElementById('mqtt-vars-row');
-        if (varEl) {
-            let h = '';
-            s.vars.forEach((v, i) => { if (v !== undefined) h += valBadge(`V${i}`, v); });
-            varEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
-        }
+        s.vars.forEach((v, i) => _setVal(varEl, `V${i}`, v));
 
-        // CMP + MATH
+        // --- CMP / MATH ---
         const cmpEl = document.getElementById('mqtt-cmp-row');
-        if (cmpEl) {
-            let h = '';
-            s.cmp.forEach((v, i)  => { if (v !== undefined) h += valBadge(`K${i}`, v); });
-            s.math.forEach((v, i) => { if (v !== undefined) h += valBadge(`M${i}`, v); });
-            cmpEl.innerHTML = h || '<span style="color:#475569;font-size:11px">—</span>';
-        }
+        s.cmp.forEach( (v, i) => _setVal(cmpEl, `K${i}`, v));
+        s.math.forEach((v, i) => _setVal(cmpEl, `M${i}`, v));
 
-        // RTC
+        // --- RTC ---
         if (s.rtc) {
             const rtcEl = document.getElementById('mqtt-monitor-rtc');
-            if (rtcEl) rtcEl.textContent = '🕐 ' + s.rtc;
+            if (rtcEl && rtcEl.textContent !== '🕐 ' + s.rtc)
+                rtcEl.textContent = '🕐 ' + s.rtc;
         }
     }
 }

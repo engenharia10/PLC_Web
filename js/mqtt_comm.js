@@ -91,7 +91,9 @@ class MQTTComm {
 
     send(dataBytes) {
         if (!this.isConnected || !this.topicTx) return;
-        this.client.publish(this.topicTx, Buffer.from(dataBytes), { qos: 0 });
+        // Passa Uint8Array direto — mqtt.js aceita no browser sem Buffer global
+        const payload = dataBytes instanceof Uint8Array ? dataBytes : new Uint8Array(dataBytes);
+        this.client.publish(this.topicTx, payload, { qos: 1 });
     }
 
     // ---- Parser ST: ----

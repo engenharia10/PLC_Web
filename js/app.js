@@ -862,6 +862,27 @@ class PLCApp {
             };
         }
 
+        // Carrega credenciais salvas
+        const saved = JSON.parse(localStorage.getItem('mqtt_cfg') || '{}');
+        if (saved.host) document.getElementById('mqtt-host').value = saved.host;
+        if (saved.user) document.getElementById('mqtt-user').value = saved.user;
+        if (saved.pass) document.getElementById('mqtt-pass').value = saved.pass;
+        if (saved.id)   document.getElementById('mqtt-device-id').value = saved.id;
+
+        // Salva ao digitar em qualquer campo
+        const saveCfg = () => {
+            localStorage.setItem('mqtt_cfg', JSON.stringify({
+                host: document.getElementById('mqtt-host').value.trim(),
+                user: document.getElementById('mqtt-user').value.trim(),
+                pass: document.getElementById('mqtt-pass').value.trim(),
+                id:   document.getElementById('mqtt-device-id').value.trim()
+            }));
+        };
+        ['mqtt-host','mqtt-user','mqtt-pass','mqtt-device-id'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', saveCfg);
+        });
+
         this.mqttComm.onLog = (msg) => this.logComm(`[MQTT] ${msg}`);
 
         this.mqttComm.onConnected = () => {

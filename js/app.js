@@ -851,6 +851,17 @@ class PLCApp {
         const discBtn  = document.getElementById('mqtt-disconnect-btn');
         const commInd  = document.getElementById('comm-status-indicator');
 
+        // Mostrar/ocultar senha
+        const passInput  = document.getElementById('mqtt-pass');
+        const passToggle = document.getElementById('mqtt-pass-toggle');
+        if (passToggle) {
+            passToggle.onclick = () => {
+                const show = passInput.type === 'password';
+                passInput.type = show ? 'text' : 'password';
+                passToggle.textContent = show ? '🙈' : '👁';
+            };
+        }
+
         this.mqttComm.onLog = (msg) => this.logComm(`[MQTT] ${msg}`);
 
         this.mqttComm.onConnected = () => {

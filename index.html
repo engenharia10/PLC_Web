@@ -113,7 +113,10 @@
                         </div>
                         <div class="config-row">
                             <label>Senha:</label>
-                            <input id="mqtt-pass" type="password" style="width:100%;padding:4px;box-sizing:border-box;">
+                            <div style="display:flex;gap:4px;width:100%;">
+                                <input id="mqtt-pass" type="password" style="flex:1;padding:4px;box-sizing:border-box;">
+                                <button type="button" id="mqtt-pass-toggle" title="Mostrar/ocultar senha" style="padding:4px 8px;background:#334155;border:1px solid #475569;border-radius:4px;color:#94a3b8;cursor:pointer;font-size:13px;">👁</button>
+                            </div>
                         </div>
                         <div class="config-row">
                             <label>Device ID (MAC):</label>
@@ -211,7 +214,7 @@
     <script src="js/canvas.js?v=15"></script>
     <script src="js/properties.js?v=13"></script>
     <script src="js/toolbar.js?v=16"></script>
-    <script src="js/app.js?v=27"></script>
+    <script src="js/app.js?v=28"></script>
     <script src="js/pwa.js?v=14"></script>
 </body>
 </html>

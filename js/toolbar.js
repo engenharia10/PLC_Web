@@ -13,6 +13,7 @@ class Toolbar {
 
     // ===== Menu Bar (do menu.py create_main_menu) =====
     _buildMenuBar() {
+        this._groupBtns = {};   // { groupName: { value: btnElement } }
         const menubar = document.getElementById('menubar');
         const menus = [
             {
@@ -46,16 +47,16 @@ class Toolbar {
             },
             {
                 label: '🎨 Tema', items: [
-                    { label: '☀️ Modo Claro', action: () => this.app.setTheme('light') },
-                    { label: '🌙 Modo Escuro', action: () => this.app.setTheme('dark') },
-                    { label: '🌑 Modo Ultra Escuro', action: () => this.app.setTheme('ultra_dark') },
-                    { label: '🔵 Modo Super Azul', action: () => this.app.setTheme('super_blue') },
+                    { label: '☀️ Modo Claro',      group: 'theme', value: 'light',      action: () => this.app.setTheme('light') },
+                    { label: '🌙 Modo Escuro',      group: 'theme', value: 'dark',       action: () => this.app.setTheme('dark') },
+                    { label: '🌑 Modo Ultra Escuro',group: 'theme', value: 'ultra_dark', action: () => this.app.setTheme('ultra_dark') },
+                    { label: '🔵 Modo Super Azul',  group: 'theme', value: 'super_blue', action: () => this.app.setTheme('super_blue') },
                 ]
             },
             {
                 label: '🖥️ Modelo', items: [
-                    { label: '⚡ ECU Max', action: () => this.app.setModel('PLC-Max.') },
-                    { label: '🔧 ECU TRM', action: () => this.app.setModel('PLC-Trm') },
+                    { label: '⚡ ECU Max', group: 'model', value: 'PLC-Max.', action: () => this.app.setModel('PLC-Max.') },
+                    { label: '🔧 ECU TRM', group: 'model', value: 'PLC-Trm', action: () => this.app.setModel('PLC-Trm') },
                 ]
             },
             {
@@ -102,11 +103,16 @@ class Toolbar {
                 } else {
                     const btn = document.createElement('button');
                     btn.className = 'menu-dropdown-item';
-                    btn.innerHTML = `<span>${item.label}</span>${item.shortcut ? `<span class="shortcut">${item.shortcut}</span>` : ''}`;
+                    btn.innerHTML = `<span class="menu-check"></span><span>${item.label}</span>${item.shortcut ? `<span class="shortcut">${item.shortcut}</span>` : ''}`;
                     btn.onclick = () => {
+                        if (item.group) this._setGroupActive(item.group, item.value);
                         item.action();
                         this._closeAllMenus();
                     };
+                    if (item.group) {
+                        if (!this._groupBtns[item.group]) this._groupBtns[item.group] = {};
+                        this._groupBtns[item.group][item.value] = btn;
+                    }
                     dropdown.appendChild(btn);
                 }
             }
@@ -133,10 +139,29 @@ class Toolbar {
 
         // Fechar ao clicar fora
         document.addEventListener('click', () => this._closeAllMenus());
+
+        // Marca seleções iniciais padrão
+        this._setGroupActive('theme', this.app.theme?.currentTheme || 'dark');
+        this._setGroupActive('model', this.app.plcType || 'PLC-Max.');
     }
 
     _closeAllMenus() {
         document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+    }
+
+    _setGroupActive(group, value) {
+        const btns = this._groupBtns[group];
+        if (!btns) return;
+        for (const [v, btn] of Object.entries(btns)) {
+            const check = btn.querySelector('.menu-check');
+            if (v === value) {
+                btn.classList.add('menu-item-active');
+                if (check) check.textContent = '✔';
+            } else {
+                btn.classList.remove('menu-item-active');
+                if (check) check.textContent = '';
+            }
+        }
     }
 
     // ===== Toolbar icons (do toolbar.py) =====

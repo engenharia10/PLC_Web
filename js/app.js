@@ -85,6 +85,7 @@ class PLCApp {
         const el = document.getElementById('status-theme');
         if (el) el.textContent = lbl;
         this._setStatus('🎨 ' + lbl + ' selecionado');
+        if (this.toolbar) this.toolbar._setGroupActive('theme', name);
     }
 
     // ===== Model =====
@@ -95,6 +96,7 @@ class PLCApp {
         const el = document.getElementById('status-model');
         if (el) el.textContent = lbl;
         this._setStatus('🖥️ Modelo ' + lbl + ' selecionado');
+        if (this.toolbar) this.toolbar._setGroupActive('model', model);
     }
 
     _setStatus(msg, timeout = 3000) {

@@ -817,15 +817,29 @@ body {
 }
 
 /* =============================================
-   Monitor WEB — Responsive (mobile)
+   Monitor windows — Responsive (mobile)
    ============================================= */
 @media (max-width: 600px) {
+    #monitor-window {
+        width: calc(100vw - 16px) !important;
+        height: 200px !important;
+        min-height: 120px !important;
+        bottom: auto !important;
+        top: 50% !important;
+        right: 8px !important;
+        left: 8px !important;
+        font-size: 11px;
+    }
+    #monitor-terminal {
+        font-size: 10px;
+    }
     #mqtt-monitor-window {
         width: calc(100vw - 16px) !important;
-        height: 280px !important;
+        height: 260px !important;
         bottom: 8px !important;
         right: 8px !important;
         left: 8px !important;
         top: auto !important;
     }
 }
+

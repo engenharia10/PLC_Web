@@ -489,26 +489,10 @@ class PLCApp {
     }
 
     _setupMonitorDrag() {
-        const win = document.getElementById('monitor-window');
-        const bar = document.getElementById('monitor-titlebar');
-        let dragging = false, ox = 0, oy = 0;
-
-        bar.addEventListener('mousedown', (e) => {
-            if (e.target.tagName === 'BUTTON') return;
-            dragging = true;
-            const rect = win.getBoundingClientRect();
-            ox = e.clientX - rect.left;
-            oy = e.clientY - rect.top;
-            win.style.right = 'auto';
-            win.style.bottom = 'auto';
-            e.preventDefault();
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!dragging) return;
-            win.style.left = (e.clientX - ox) + 'px';
-            win.style.top  = (e.clientY - oy) + 'px';
-        });
-        document.addEventListener('mouseup', () => { dragging = false; });
+        this._makeDraggable(
+            document.getElementById('monitor-window'),
+            document.getElementById('monitor-titlebar')
+        );
     }
 
     updateCommStatusIndicator() {

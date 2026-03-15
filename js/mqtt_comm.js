@@ -57,12 +57,12 @@ class MQTTComm {
             username: user,
             password: pass,
             clean: true,
-            reconnectPeriod: 0,        // sem auto-reconexão
+            reconnectPeriod: 2000,     // Auto-reconecta (Android Chrome suspende abas)
             connectTimeout: 15000,
             protocolVersion: 4,        // MQTT 3.1.1
-            // Fix Chrome/Android: cria WebSocket sem Sec-WebSocket-Protocol header.
-            // Chrome mobile descarta frames silenciosamente se o broker não ecoar o subprotocolo.
-            createWebsocket: (url, _protocols, _opts) => new WebSocket(url)
+            protocolId: 'MQTT',
+            keepalive: 60,
+            rejectUnauthorized: false
         });
 
         // Timeout visível: se em 15s nada acontecer, avisa o usuário

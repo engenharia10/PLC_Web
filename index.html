@@ -206,8 +206,9 @@
     </div>
 
     <!-- Scripts (ordem importa) -->
-    <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js"></script>
-    <script src="js/mqtt_comm.js?v=6"></script>
+    <script src="js/mqtt.min.js"></script>
+    <script>console.log('[MQTT LIB]', typeof mqtt !== 'undefined' ? 'OK' : 'FALHOU — lib não carregou');</script>
+    <script src="js/mqtt_comm.js?v=7"></script>
     <script src="js/plc_protocol.js?v=8"></script>
     <script src="js/serial_comm.js?v=8"></script>
     <script src="js/ble_comm.js?v=8"></script>

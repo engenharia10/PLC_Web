@@ -99,15 +99,29 @@ class MQTTComm {
     // ---- Parser ST: ----
     _processRaw(text) {
         this._rxBuffer += text;
-        // Extrai blocos completos (um bloco termina quando o próximo ST: começa ou \0)
+
+        // Processa todos os blocos completos (dois ST: consecutivos)
         let idx;
         while ((idx = this._rxBuffer.indexOf('ST:', 3)) !== -1) {
             const block = this._rxBuffer.slice(0, idx);
             this._rxBuffer = this._rxBuffer.slice(idx);
             if (block.includes('ST:')) this._parseBlock(block);
         }
-        // Flush se buffer grande
+
+        // Flush por timeout: garante que o último/único pacote seja processado
+        // mesmo que não chegue um segundo ST: logo em seguida (ex: Android com
+        // pacotes espaçados ou conexão lenta)
+        clearTimeout(this._flushTimer);
+        this._flushTimer = setTimeout(() => {
+            if (this._rxBuffer.includes('ST:')) {
+                this._parseBlock(this._rxBuffer);
+                this._rxBuffer = '';
+            }
+        }, 300);
+
+        // Flush imediato se buffer muito grande
         if (this._rxBuffer.length > 2048) {
+            clearTimeout(this._flushTimer);
             this._parseBlock(this._rxBuffer);
             this._rxBuffer = '';
         }

@@ -1036,9 +1036,25 @@ class PLCApp {
             }
         };
 
-        // --- I/O (fixo 16 bits visíveis) ---
-        _setIO(document.getElementById('mqtt-inputs-grid'),  'I', s.inputs,  16);
-        _setIO(document.getElementById('mqtt-outputs-grid'), 'Q', s.outputs, 16);
+        // --- I/O — contagem conforme modelo selecionado ---
+        const isTrm = (this.plcType === 'PLC-Trm');
+        const nInputs  = isTrm ? 20 : 29;   // TRM: I0.0–I0.19 | MAX: I0.0–I0.28
+        const nOutputs = isTrm ? 20 : 30;   // TRM: Q0.0–Q0.19 | MAX: Q0.0–Q0.29
+
+        // Se o modelo mudou, limpa cache e containers para recriar os badges
+        if (this._mqttIoModel !== this.plcType) {
+            this._mqttIoModel = this.plcType;
+            ['I', 'Q'].forEach(pfx => {
+                for (let i = 0; i < 32; i++) delete D[pfx + i];
+            });
+            const gi = document.getElementById('mqtt-inputs-grid');
+            const go = document.getElementById('mqtt-outputs-grid');
+            if (gi) gi.innerHTML = '';
+            if (go) go.innerHTML = '';
+        }
+
+        _setIO(document.getElementById('mqtt-inputs-grid'),  'I', s.inputs,  nInputs);
+        _setIO(document.getElementById('mqtt-outputs-grid'), 'Q', s.outputs, nOutputs);
 
         // --- Timers ---
         const tmEl = document.getElementById('mqtt-timers-row');

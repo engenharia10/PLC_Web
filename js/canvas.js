@@ -673,13 +673,13 @@ class LadderCanvas {
             ctx.textBaseline = 'top';
             ctx.fillText(el.name, x, y + 17);
 
-            // Valor live (timer/counter/var) abaixo do elemento
+            // Valor live (timer/counter/var) acima do elemento
             if (el._liveVal !== undefined) {
                 ctx.fillStyle = '#38bdf8';
-                ctx.font = '8px "Segoe UI"';
+                ctx.font = 'bold 9px "Segoe UI"';
                 ctx.textAlign = 'center';
-                ctx.textBaseline = 'top';
-                ctx.fillText(String(el._liveVal), x, y + 28);
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(String(el._liveVal), x, y - 18);
             }
         }
     }

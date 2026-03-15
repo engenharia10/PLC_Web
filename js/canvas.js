@@ -28,8 +28,8 @@ class LadderCanvas {
 
             // Ajusta margens nos celulares para não desperdiçar espaço com trilhos azuis muito afastados
             const isMobile = window.innerWidth <= 600;
-            this.LEFT_MARGIN = isMobile ? 35 : 50;
-            this.RIGHT_MARGIN = isMobile ? 15 : 20;
+            this.LEFT_MARGIN = isMobile ? 20 : 50;
+            this.RIGHT_MARGIN = isMobile ? 8 : 20;
             this.canvas.style.width = rect.width + 'px';
             this.canvas.style.height = rect.height + 'px';
             this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -629,9 +629,9 @@ class LadderCanvas {
 
             ctx.fillStyle = rungColor;
             ctx.font = 'bold 11px "Segoe UI"';
-            ctx.textAlign = 'right';
+            ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`R${rung.index}`, this.LEFT_MARGIN - 8, rung.y);
+            ctx.fillText(`R${rung.index}`, 2, rung.y);
         }
     }
 

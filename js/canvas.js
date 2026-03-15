@@ -500,7 +500,8 @@ class LadderCanvas {
         const t = this.app.theme;
 
         // Compute world width from elements
-        let maxElemX = this.width / this.scale;
+        // Sem elementos: worldWidth = canvas width (rails cabem na tela sem scroll)
+        let maxElemX = this.width / this.scale - 50;
         for (const el of this.app.elements) {
             if (el.type === 'branch') maxElemX = Math.max(maxElemX, el.x + (el.width || 120) + 80);
             else maxElemX = Math.max(maxElemX, el.x + COMPONENT_HALF_WIDTH + 80);
@@ -514,7 +515,8 @@ class LadderCanvas {
             maxY = Math.max(maxY, e.type === 'branch' ? (e.branch_y || (e.y + 80)) : e.y);
         }
 
-        const worldH = maxY + 600;
+        // Rails preenchem toda a área visível da canvas (portrait mobile incluso)
+        const worldH = Math.max(maxY + 600, this.height / this.scale);
         this.maxScrollY = Math.max(0, worldH * this.scale - this.height);
         this.maxScrollX = Math.max(0, this._worldWidth * this.scale - this.width);
 

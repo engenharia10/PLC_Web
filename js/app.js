@@ -830,10 +830,22 @@ class PLCApp {
     _setupMQTT() {
         if (!this.mqttComm) return;
 
-        const statusEl = document.getElementById('mqtt-status-msg');
-        const connBtn  = document.getElementById('mqtt-connect-btn');
-        const discBtn  = document.getElementById('mqtt-disconnect-btn');
-        const commInd  = document.getElementById('comm-status-indicator');
+        const statusEl  = document.getElementById('mqtt-status-msg');
+        const connBtn   = document.getElementById('mqtt-connect-btn');
+        const discBtn   = document.getElementById('mqtt-disconnect-btn');
+        const commInd   = document.getElementById('comm-status-indicator');
+        const authRow   = document.getElementById('mqtt-auth-row');
+        const hostSel   = document.getElementById('mqtt-host');
+
+        // Mostra/oculta auth conforme broker selecionado
+        const updateAuthVisibility = () => {
+            const isEmqx = hostSel && hostSel.value.includes('emqx.io');
+            if (authRow) authRow.style.display = isEmqx ? 'none' : '';
+        };
+        if (hostSel) {
+            hostSel.addEventListener('change', updateAuthVisibility);
+            updateAuthVisibility();
+        }
 
         // Mostrar/ocultar senha
         const passInput  = document.getElementById('mqtt-pass');
@@ -928,11 +940,12 @@ class PLCApp {
         };
 
         connBtn.onclick = () => {
-            const host = document.getElementById('mqtt-host').value.trim();
-            const user = document.getElementById('mqtt-user').value.trim();
-            const pass = document.getElementById('mqtt-pass').value.trim();
-            const id   = document.getElementById('mqtt-device-id').value.trim();
-            if (!host || !user || !id) {
+            const host    = document.getElementById('mqtt-host').value.trim();
+            const isEmqx  = host.includes('emqx.io');
+            const user    = isEmqx ? '' : document.getElementById('mqtt-user').value.trim();
+            const pass    = isEmqx ? '' : document.getElementById('mqtt-pass').value.trim();
+            const id      = document.getElementById('mqtt-device-id').value.trim();
+            if (!host || (!isEmqx && !user) || !id) {
                 if (statusEl) statusEl.textContent = '⚠️ Preencha Host, Usuário e Device ID';
                 return;
             }

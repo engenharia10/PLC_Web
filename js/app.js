@@ -950,46 +950,33 @@ class PLCApp {
     _makeDraggable(win, handle) {
         if (!win || !handle || win._draggable) return;
         win._draggable = true;
-        let ox = 0, oy = 0;
+        let dragging = false, ox = 0, oy = 0;
 
-        const startDrag = (cx, cy) => {
+        handle.addEventListener('pointerdown', e => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
             const r = win.getBoundingClientRect();
-            // Converte para posição left/top se ainda usa bottom/right
             win.style.left   = r.left + 'px';
             win.style.top    = r.top  + 'px';
             win.style.bottom = 'auto';
             win.style.right  = 'auto';
-            ox = cx - r.left;
-            oy = cy - r.top;
-        };
-        const moveDrag = (cx, cy) => {
-            const maxX = window.innerWidth  - win.offsetWidth;
-            const maxY = window.innerHeight - win.offsetHeight;
-            win.style.left = Math.max(0, Math.min(cx - ox, maxX)) + 'px';
-            win.style.top  = Math.max(0, Math.min(cy - oy, maxY)) + 'px';
-        };
-
-        // Mouse
-        handle.addEventListener('mousedown', e => {
-            if (e.button !== 0) return;
-            startDrag(e.clientX, e.clientY);
-            const onMove = e => moveDrag(e.clientX, e.clientY);
-            const onUp   = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup',   onUp);
+            ox = e.clientX - r.left;
+            oy = e.clientY - r.top;
+            dragging = true;
+            handle.setPointerCapture(e.pointerId);
             e.preventDefault();
         });
 
-        // Touch
-        handle.addEventListener('touchstart', e => {
-            const t = e.touches[0];
-            startDrag(t.clientX, t.clientY);
-            const onMove = e => { const t = e.touches[0]; moveDrag(t.clientX, t.clientY); };
-            const onEnd  = () => { document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onEnd); };
-            document.addEventListener('touchmove', onMove, { passive: false });
-            document.addEventListener('touchend',  onEnd);
+        handle.addEventListener('pointermove', e => {
+            if (!dragging) return;
+            const maxX = window.innerWidth  - win.offsetWidth;
+            const maxY = window.innerHeight - win.offsetHeight;
+            win.style.left = Math.max(0, Math.min(e.clientX - ox, maxX)) + 'px';
+            win.style.top  = Math.max(0, Math.min(e.clientY - oy, maxY)) + 'px';
             e.preventDefault();
-        }, { passive: false });
+        });
+
+        handle.addEventListener('pointerup',     () => { dragging = false; });
+        handle.addEventListener('pointercancel', () => { dragging = false; });
     }
 
     _renderMQTTState(s) {

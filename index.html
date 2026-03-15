@@ -104,8 +104,10 @@
                     <div id="panel-mqtt" class="tab-panel" style="display:none;">
                         <div class="config-row">
                             <label>Broker Host:</label>
-                            <input id="mqtt-host" type="text" style="width:100%;padding:4px;box-sizing:border-box;"
-                                value="04ee441e0bb24887aeb3cb2467b2743c.s1.eu.hivemq.cloud">
+                            <select id="mqtt-host" style="width:100%;padding:4px;box-sizing:border-box;">
+                                <option value="04ee441e0bb24887aeb3cb2467b2743c.s1.eu.hivemq.cloud">HiveMQ Cloud (Produção)</option>
+                                <option value="broker.emqx.io">EMQX Public (Teste/Fallback)</option>
+                            </select>
                         </div>
                         <div class="config-row">
                             <label>Usuário:</label>

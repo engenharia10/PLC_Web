@@ -37,7 +37,6 @@ class MQTTComm {
         };
     }
 
-    // HiveMQ Cloud: WebSocket TLS porta 8884
     connect(host, user, pass, deviceId) {
         if (typeof mqtt === 'undefined') {
             this._log('⚠️ Biblioteca MQTT não carregada — recarregue a página');
@@ -47,7 +46,12 @@ class MQTTComm {
         this.topicRx  = `plc/${this.deviceId}/rx`;
         this.topicTx  = `plc/${this.deviceId}/tx`;
 
-        const url = `wss://${host}:8884/mqtt`;
+        // HiveMQ Cloud usa 8884; EMQX usa 8084
+        let wssPort = 8084; // Padrão EMQX e maioria dos brokers
+        if (host.includes('hivemq.cloud')) {
+            wssPort = 8884;
+        }
+        const url = `wss://${host}:${wssPort}/mqtt`;
         const clientId = 'plcweb_' + Math.random().toString(16).slice(2, 8);
 
         this._log(`Conectando: ${url}`);

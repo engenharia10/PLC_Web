@@ -3,7 +3,7 @@
  * Estratégia: Cache-First com fallback para rede
  */
 
-const CACHE_NAME = 'plc-editor-v25';
+const CACHE_NAME = 'plc-editor-v26';
 
 const ASSETS_TO_CACHE = [
     './',

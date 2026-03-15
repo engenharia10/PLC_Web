@@ -805,3 +805,17 @@ html, body {
         font-size: 12px;
     }
 }
+
+/* =============================================
+   Monitor WEB — Responsive (mobile)
+   ============================================= */
+@media (max-width: 600px) {
+    #mqtt-monitor-window {
+        width: calc(100vw - 16px) !important;
+        height: 280px !important;
+        bottom: 8px !important;
+        right: 8px !important;
+        left: 8px !important;
+        top: auto !important;
+    }
+}

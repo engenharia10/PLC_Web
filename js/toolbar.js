@@ -103,7 +103,7 @@ class Toolbar {
                 } else {
                     const btn = document.createElement('button');
                     btn.className = 'menu-dropdown-item';
-                    btn.innerHTML = `<span class="menu-check"></span><span>${item.label}</span>${item.shortcut ? `<span class="shortcut">${item.shortcut}</span>` : ''}`;
+                    btn.innerHTML = `<span>${item.label}</span>${item.shortcut ? `<span class="shortcut">${item.shortcut}</span>` : ''}<span class="menu-check"></span>`;
                     btn.onclick = () => {
                         if (item.group) this._setGroupActive(item.group, item.value);
                         item.action();
@@ -141,7 +141,7 @@ class Toolbar {
         document.addEventListener('click', () => this._closeAllMenus());
 
         // Marca seleções iniciais padrão
-        this._setGroupActive('theme', this.app.theme?.currentTheme || 'dark');
+        this._setGroupActive('theme', this.app.theme?.themeName || 'dark');
         this._setGroupActive('model', this.app.plcType || 'PLC-Max.');
     }
 

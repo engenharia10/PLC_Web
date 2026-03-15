@@ -137,6 +137,31 @@ class PLCApp {
                 this.sendCommCommand(PLCProtocol.createStopPacket(), "STOP");
             }
         }
+        // Ticker local para elementos RTC (atualiza hora do sistema a cada 1s)
+        if (this.simulationRunning) {
+            this._rtcTicker = setInterval(() => {
+                if (!this.activeComm) {
+                    const now = new Date();
+                    const pad = n => String(n).padStart(2, '0');
+                    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                    let changed = false;
+                    for (const el of this.elements) {
+                        if (el.type === 'rtc' && el._liveVal !== timeStr) {
+                            el._liveVal = timeStr;
+                            el._active = true;
+                            changed = true;
+                        }
+                    }
+                    if (changed) this.ladderCanvas.render();
+                }
+            }, 1000);
+        } else {
+            clearInterval(this._rtcTicker);
+            for (const el of this.elements) {
+                if (el.type === 'rtc') { el._liveVal = undefined; el._active = false; }
+            }
+            this.ladderCanvas.render();
+        }
     }
 
     // ===== Delete =====
@@ -1153,6 +1178,15 @@ class PLCApp {
                 const idx = parseInt((name.match(/(\d+)$/) || [])[1] ?? '0');
                 const val = s.math[idx];
                 if (val !== undefined) { liveVal = val; }
+            }
+
+            if (el.type === 'rtc') {
+                // Mostra só HH:MM:SS do RTC recebido via MQTT
+                if (s.rtc) {
+                    const timePart = s.rtc.split(' ')[1] || s.rtc;
+                    liveVal = timePart;
+                    active = true;
+                }
             }
 
             if (el._active !== active || el._liveVal !== liveVal) {

@@ -70,10 +70,12 @@ body {
 #menubar {
     display: flex;
     align-items: center;
-    background: var(--menu-bg);
+    background: rgba(51, 65, 85, 0.82);
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
     min-height: 36px;
     padding: 0 4px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
     z-index: 1000;
     overflow-x: auto;
     white-space: nowrap;
@@ -109,10 +111,8 @@ body {
 }
 
 .menu-dropdown {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
+    /* display controlado via JS (appended ao body, fora do stacking context do menubar) */
+    position: fixed;
     min-width: 240px;
     background: var(--menu-bg);
     border: 1px solid rgba(255,255,255,0.1);
@@ -120,9 +120,7 @@ body {
     padding: 4px;
     z-index: 2000;
     box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-    animation: menuSlide 0.12s ease-out;
 }
-.menu-item.open .menu-dropdown { display: block; }
 
 @keyframes menuSlide {
     from { opacity: 0; transform: translateY(-4px); }
@@ -176,7 +174,10 @@ body {
 #toolbar {
     display: flex;
     align-items: center;
-    background: var(--component-header-bg);
+    background: rgba(99, 102, 241, 0.78);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border-bottom: 1px solid rgba(255,255,255,0.12);
     min-height: 48px;
     padding: 0 10px;
     gap: 2px;
@@ -188,29 +189,29 @@ body {
 }
 
 .toolbar-btn {
-    background: transparent;
-    border: none;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
     color: white;
-    font-size: 20px;
-    padding: 8px 10px;
-    border-radius: 6px;
+    font-size: 28px;
+    padding: 6px 12px;
+    border-radius: 8px;
     cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
+    transition: background 0.15s, transform 0.1s, border-color 0.15s, box-shadow 0.15s;
     line-height: 1;
 }
 .toolbar-btn:hover {
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.20);
+    border-color: rgba(255,255,255,0.35);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
     transform: scale(1.1);
 }
 .toolbar-btn:active {
     transform: scale(0.95);
+    background: rgba(255,255,255,0.12);
 }
 
 .toolbar-separator {
-    width: 1px;
-    height: 28px;
-    background: rgba(255,255,255,0.2);
-    margin: 0 6px;
+    display: none;
 }
 
 .toolbar-spacer {
@@ -227,8 +228,10 @@ body {
 
 /* ===== Component Bar (horizontal, above canvas — matches Python layout) ===== */
 #component-bar {
-    background: var(--component-header-bg);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: rgba(99, 102, 241, 0.65);
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+    border-bottom: 1px solid rgba(255,255,255,0.10);
     padding: 6px 10px;
     flex-shrink: 0;
 }
@@ -287,10 +290,15 @@ body {
 }
 
 .comp-icon {
-    font-size: 10px;
-    font-weight: 700;
-    white-space: nowrap;
-    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 20px;
+}
+.comp-icon svg {
+    width: 24px;
+    height: 20px;
 }
 .comp-label {
     font-family: 'Inter', sans-serif;
@@ -380,6 +388,75 @@ body {
     padding-right: 30px;
 }
 
+.props-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 0;
+}
+
+.props-radio-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--fg);
+    cursor: pointer;
+    padding: 2px 0;
+}
+
+.props-radio-label input[type="radio"],
+.props-radio-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    accent-color: #3b82f6;
+    cursor: pointer;
+}
+
+.props-checkbox-group .props-radio-label {
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.props-textarea {
+    width: 100%;
+    background: var(--entry-bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    resize: vertical;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+.props-textarea:focus {
+    border-color: #3b82f6;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+
+.props-byte-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 4px 0;
+}
+
+.props-byte-visual {
+    margin-top: 6px;
+    padding: 4px 8px;
+    background: var(--entry-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: 'Consolas', monospace;
+    font-weight: bold;
+    text-align: center;
+    color: var(--fg);
+}
+
 .props-delete-btn {
     display: block;
     width: 100%;
@@ -403,7 +480,11 @@ body {
 #canvas-area {
     flex: 1;
     position: relative;
-    background: var(--canvas-bg);
+    background:
+        radial-gradient(ellipse at 18% 55%, rgba(99, 102, 241, 0.07) 0%, transparent 58%),
+        radial-gradient(ellipse at 82% 18%, rgba(59, 130, 246, 0.05) 0%, transparent 52%),
+        radial-gradient(ellipse at 60% 85%, rgba(16, 185, 129, 0.04) 0%, transparent 45%),
+        var(--canvas-bg);
     overflow: hidden;
 }
 

@@ -93,8 +93,13 @@ class Toolbar {
             trigger.textContent = menu.label;
             menuItem.appendChild(trigger);
 
+            // Dropdown é appended ao <body> para escapar do stacking context do menubar
+            // (backdrop-filter cria um novo containing block que quebra position:fixed)
             const dropdown = document.createElement('div');
             dropdown.className = 'menu-dropdown';
+            dropdown.style.display = 'none';
+            document.body.appendChild(dropdown);
+
             for (const item of menu.items) {
                 if (item.type === 'separator') {
                     const sep = document.createElement('div');
@@ -116,7 +121,9 @@ class Toolbar {
                     dropdown.appendChild(btn);
                 }
             }
-            menuItem.appendChild(dropdown);
+
+            // Guarda referência ao dropdown no trigger para _closeAllMenus
+            trigger._dropdown = dropdown;
 
             trigger.onclick = (e) => {
                 e.stopPropagation();
@@ -124,13 +131,12 @@ class Toolbar {
                 this._closeAllMenus();
                 if (!isOpen) {
                     menuItem.classList.add('open');
-                    
-                    // Como a menubar agora tem overflow-x, dropdowns com position absolute serão cortados!
-                    // Fixamos o dropdown e usamos Javascript para achar a coordenada XYZ na tela
                     const rect = trigger.getBoundingClientRect();
                     dropdown.style.position = 'fixed';
                     dropdown.style.top = rect.bottom + 'px';
                     dropdown.style.left = rect.left + 'px';
+                    dropdown.style.display = 'block';
+                    dropdown.style.animation = 'menuSlide 0.12s ease-out';
                 }
             };
 
@@ -146,7 +152,12 @@ class Toolbar {
     }
 
     _closeAllMenus() {
-        document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+        document.querySelectorAll('.menu-item.open').forEach(m => {
+            m.classList.remove('open');
+            // Esconde dropdown que está no <body>
+            const trigger = m.querySelector('.menu-trigger');
+            if (trigger?._dropdown) trigger._dropdown.style.display = 'none';
+        });
     }
 
     _setGroupActive(group, value) {
@@ -209,7 +220,7 @@ class Toolbar {
         // Botão de Rung
         const rungBtn = document.createElement('button');
         rungBtn.className = 'component-btn';
-        rungBtn.innerHTML = '<span class="comp-icon">│───│</span><span class="comp-label">Rung</span>';
+        rungBtn.innerHTML = `<span class="comp-icon">${COMPONENT_SVG_ICONS.rung}</span><span class="comp-label">Rung</span>`;
         rungBtn.onclick = () => this.app.addRung();
         palette.appendChild(rungBtn);
 
@@ -227,7 +238,8 @@ class Toolbar {
             }
             
             btn.dataset.compType = compType;
-            btn.innerHTML = `<span class="comp-icon">${data.icon}</span><span class="comp-label">${shortLabel}</span>`;
+            const svgIcon = COMPONENT_SVG_ICONS[compType] || data.icon;
+            btn.innerHTML = `<span class="comp-icon">${svgIcon}</span><span class="comp-label">${shortLabel}</span>`;
 
             // Drag and drop HTML5 (Apenas para Desktop)
             btn.addEventListener('dragstart', (e) => {

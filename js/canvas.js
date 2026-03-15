@@ -526,18 +526,25 @@ class LadderCanvas {
 
         ctx.save();
 
+        // Background sólido em screen-space (antes do transform de zoom/pan)
+        ctx.fillStyle = t.get('CANVAS_BG');
+        ctx.fillRect(0, 0, this.width, this.height);
+
+        // Gradientes radiais decorativos em screen-space (fixos na tela)
+        const _addRadial = (cx, cy, r, color) => {
+            const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            g.addColorStop(0, color);
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, this.width, this.height);
+        };
+        _addRadial(this.width * 0.18, this.height * 0.55, this.width * 0.45, 'rgba(99,102,241,0.14)');
+        _addRadial(this.width * 0.82, this.height * 0.18, this.width * 0.38, 'rgba(59,130,246,0.10)');
+        _addRadial(this.width * 0.60, this.height * 0.88, this.width * 0.35, 'rgba(16,185,129,0.08)');
+
         // Apply zoom + pan transform
         ctx.scale(this.scale, this.scale);
         ctx.translate(-this.scrollX / this.scale, -this.scrollY / this.scale);
-
-        // Background
-        ctx.fillStyle = t.get('CANVAS_BG');
-        ctx.fillRect(
-            this.scrollX / this.scale,
-            this.scrollY / this.scale,
-            this.width  / this.scale,
-            this.height / this.scale
-        );
 
         const totalH = worldH;
 
@@ -669,8 +676,10 @@ class LadderCanvas {
             ctx.fillStyle = el._active ? '#052e16' : canvasBg;
             ctx.strokeStyle = el._active ? '#22c55e' : iconColor;
             ctx.lineWidth = el._active ? 2 : 1;
-            ctx.fillRect(x - hw, y - 15, hw * 2, 30);
-            ctx.strokeRect(x - hw, y - 15, hw * 2, 30);
+            ctx.beginPath();
+            ctx.roundRect(x - hw, y - 15, hw * 2, 30, 6);
+            ctx.fill();
+            ctx.stroke();
 
             const icon = getElementIcon(el);
             ctx.fillStyle = el._active ? '#4ade80' : iconColor;
@@ -688,10 +697,10 @@ class LadderCanvas {
             // Valor live (timer/counter/var) acima do elemento
             if (el._liveVal !== undefined) {
                 ctx.fillStyle = '#38bdf8';
-                ctx.font = 'bold 9px "Segoe UI"';
+                ctx.font = 'bold 12px "Segoe UI"';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillText(String(el._liveVal), x, y - 28);
+                ctx.fillText(String(el._liveVal), x, y - 26);
             }
         }
     }
@@ -709,13 +718,19 @@ class LadderCanvas {
             const sx = el.x, sy = el.rung_y || el.y;
             const ey = el.branch_y || (el.y + 60);
             const ex = sx + (el.width || 120);
-            ctx.strokeRect(sx - 4, sy - 4, (ex - sx) + 8, (ey - sy) + 8);
+            ctx.beginPath();
+            ctx.roundRect(sx - 4, sy - 4, (ex - sx) + 8, (ey - sy) + 8, 6);
+            ctx.stroke();
             ctx.setLineDash([]);
             ctx.fillStyle = '#3b82f6';
-            ctx.fillRect(ex - 4, (sy + ey) / 2 - 5, 8, 10);
+            ctx.beginPath();
+            ctx.roundRect(ex - 4, (sy + ey) / 2 - 5, 8, 10, 3);
+            ctx.fill();
         } else {
             const hw = COMPONENT_HALF_WIDTH + 3;
-            ctx.strokeRect(el.x - hw, el.y - 18, hw * 2, 36);
+            ctx.beginPath();
+            ctx.roundRect(el.x - hw, el.y - 18, hw * 2, 36, 8);
+            ctx.stroke();
         }
 
         ctx.setLineDash([]);

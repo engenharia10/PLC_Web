@@ -154,9 +154,9 @@ class LadderCanvas {
 
     // ===== Touch Events (Mobile) =====
     _onTouchStart(e) {
-        e.preventDefault();
-
         if (e.touches.length === 2) {
+            e.preventDefault();
+            this._allowPTR = false;
             // Pinch-to-zoom start
             this._pinchActive = true;
             this.isPanning = false;
@@ -177,10 +177,14 @@ class LadderCanvas {
         if (e.touches.length === 1) {
             this._pinchActive = false;
             const touch = e.touches[0];
-            const simEl = { clientX: touch.clientX, clientY: touch.clientY };
 
+            // Permite pull-to-refresh: toque único, canvas no topo, toque perto do topo da tela
+            this._allowPTR = (this.scrollY <= 1 && touch.clientY < 80);
+            if (!this._allowPTR) e.preventDefault();
+
+            const simEl = { clientX: touch.clientX, clientY: touch.clientY };
             this.isPanning = false;
-            this._onMouseDown(simEl);
+            if (!this._allowPTR) this._onMouseDown(simEl);
 
             if (!this.isDragging && !this.isResizing) {
                 this.isPanning = true;
@@ -194,6 +198,12 @@ class LadderCanvas {
     }
 
     _onTouchMove(e) {
+        // Pull-to-refresh: deixa o browser agir quando dedo desce a partir do topo
+        if (this._allowPTR && e.touches.length === 1) {
+            const dy = e.touches[0].clientY - this.panStartY;
+            if (dy > 0) return; // descendo → browser mostra animação de refresh
+            this._allowPTR = false; // mudou direção → JS assume controle
+        }
         e.preventDefault();
 
         if (this._pinchActive && e.touches.length === 2) {

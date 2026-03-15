@@ -395,7 +395,7 @@ html, body {
     width: 100%;
     height: 100%;
     cursor: crosshair;
-    touch-action: none;
+    touch-action: manipulation; /* permite pull-to-refresh; JS controla pan/zoom via preventDefault */
 }
 
 /* ===== Status Bar ===== */

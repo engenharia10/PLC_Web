@@ -889,7 +889,7 @@ class PLCApp {
             connBtn.disabled = true;
             discBtn.disabled = false;
             if (statusEl) statusEl.textContent = '✅ Conectado — ' + this.mqttComm.deviceId;
-            if (commInd) commInd.textContent = '☁️ MQTT Online';
+            if (commInd) commInd.textContent = '☁️ WEB Online';
             this.activeComm = 'mqtt';
             // Abre monitor MQTT
             document.getElementById('mqtt-monitor-window').classList.remove('hidden');

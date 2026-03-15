@@ -1,4 +1,4 @@
-// mqtt_comm.js v=1
+// mqtt_comm.js v=4
 // Cliente MQTT (WebSocket) para HiveMQ Cloud + parser ST: telemetria
 
 class MQTTComm {
@@ -8,7 +8,7 @@ class MQTTComm {
         this.deviceId     = '';
         this.topicRx      = '';
         this.topicTx      = '';
-        this._rxBuffer    = '';
+        this._connTimeout = null;
 
         // Callbacks
         this.onConnected     = null; // ()
@@ -40,8 +40,8 @@ class MQTTComm {
     // HiveMQ Cloud: WebSocket TLS porta 8884
     connect(host, user, pass, deviceId) {
         if (typeof mqtt === 'undefined') {
-            this._log('mqtt.js não carregado');
-            return;
+            this._log('⚠️ Biblioteca MQTT não carregada — recarregue a página');
+            return false;
         }
         this.deviceId = deviceId.toUpperCase().replace(/:/g, '');
         this.topicRx  = `plc/${this.deviceId}/rx`;
@@ -50,80 +50,83 @@ class MQTTComm {
         const url = `wss://${host}:8884/mqtt`;
         const clientId = 'plcweb_' + Math.random().toString(16).slice(2, 8);
 
+        this._log(`Conectando: ${url}`);
+
         this.client = mqtt.connect(url, {
             clientId,
             username: user,
             password: pass,
             clean: true,
-            reconnectPeriod: 3000,
-            connectTimeout: 10000
+            reconnectPeriod: 0,        // sem auto-reconexão — evita loop silencioso
+            connectTimeout: 15000,
+            protocolVersion: 4         // MQTT 3.1.1 — melhor compatibilidade WSS Chrome
         });
 
+        // Timeout visível: se em 15s nada acontecer, avisa o usuário
+        this._connTimeout = setTimeout(() => {
+            if (!this.isConnected) {
+                this._log('⏱️ Tempo limite — verifique host, usuário, senha e se a porta 8884 não está bloqueada na sua rede');
+                this.disconnect();
+                if (this.onDisconnected) this.onDisconnected();
+            }
+        }, 15000);
+
         this.client.on('connect', () => {
+            clearTimeout(this._connTimeout);
             this.isConnected = true;
             this.client.subscribe(this.topicRx, { qos: 0 });
-            this._log(`MQTT conectado | Device: ${this.deviceId}`);
+            this._log(`✅ Conectado | Device: ${this.deviceId}`);
             if (this.onConnected) this.onConnected();
         });
 
         this.client.on('message', (topic, message) => {
             if (topic === this.topicRx) {
                 if (this.onData) this.onData(message);
-                this._processRaw(new TextDecoder().decode(message));
+                this._processRaw(new TextDecoder('utf-8', { fatal: false }).decode(message));
             }
         });
 
         this.client.on('error', (e) => {
-            this._log(`MQTT erro: ${e.message}`);
+            clearTimeout(this._connTimeout);
+            this._log(`❌ Erro: ${e.message || e}`);
         });
 
         this.client.on('close', () => {
+            clearTimeout(this._connTimeout);
             this.isConnected = false;
-            this._log('MQTT desconectado');
+            this._log('🔌 Desconectado');
             if (this.onDisconnected) this.onDisconnected();
         });
+
+        this.client.on('offline', () => {
+            this._log('📡 Sem rede — verifique sua conexão');
+        });
+
+        return true;
     }
 
     disconnect() {
+        clearTimeout(this._connTimeout);
         if (this.client) { this.client.end(true); this.client = null; }
         this.isConnected = false;
     }
 
     send(dataBytes) {
         if (!this.isConnected || !this.topicTx) return;
-        // Passa Uint8Array direto — mqtt.js aceita no browser sem Buffer global
         const payload = dataBytes instanceof Uint8Array ? dataBytes : new Uint8Array(dataBytes);
         this.client.publish(this.topicTx, payload, { qos: 1 });
     }
 
     // ---- Parser ST: ----
+    // Mensagens MQTT são unidades completas — parse direto, sem buffer
     _processRaw(text) {
-        this._rxBuffer += text;
-
-        // Processa todos os blocos completos (dois ST: consecutivos)
-        let idx;
-        while ((idx = this._rxBuffer.indexOf('ST:', 3)) !== -1) {
-            const block = this._rxBuffer.slice(0, idx);
-            this._rxBuffer = this._rxBuffer.slice(idx);
-            if (block.includes('ST:')) this._parseBlock(block);
-        }
-
-        // Flush por timeout: garante que o último/único pacote seja processado
-        // mesmo que não chegue um segundo ST: logo em seguida (ex: Android com
-        // pacotes espaçados ou conexão lenta)
-        clearTimeout(this._flushTimer);
-        this._flushTimer = setTimeout(() => {
-            if (this._rxBuffer.includes('ST:')) {
-                this._parseBlock(this._rxBuffer);
-                this._rxBuffer = '';
+        if (!text || !text.includes('ST:')) return;
+        // Split em blocos ST: (suporte a múltiplos blocos por mensagem)
+        const blocks = text.split(/(?=ST:)/);
+        for (const block of blocks) {
+            if (block.trimStart().startsWith('ST:')) {
+                try { this._parseBlock(block); } catch (_) { /* ignora bloco malformado */ }
             }
-        }, 300);
-
-        // Flush imediato se buffer muito grande
-        if (this._rxBuffer.length > 2048) {
-            clearTimeout(this._flushTimer);
-            this._parseBlock(this._rxBuffer);
-            this._rxBuffer = '';
         }
     }
 

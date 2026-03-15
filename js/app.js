@@ -883,7 +883,11 @@ class PLCApp {
             if (el) el.addEventListener('input', saveCfg);
         });
 
-        this.mqttComm.onLog = (msg) => this.logComm(`[MQTT] ${msg}`);
+        this.mqttComm.onLog = (msg) => {
+            this.logComm(`[MQTT] ${msg}`);
+            // Erros e avisos visíveis no modal (não só no monitor serial)
+            if (statusEl) statusEl.textContent = msg;
+        };
 
         this.mqttComm.onConnected = () => {
             connBtn.disabled = true;

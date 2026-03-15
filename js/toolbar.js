@@ -71,6 +71,7 @@ class Toolbar {
                     { label: '⬆️ Transferir Programa', action: () => this.app.uploadToPLC() },
                     { type: 'separator' },
                     { label: '🖥️ Monitor Serial', action: () => this.app.showMonitor() },
+                    { label: '☁️ Monitor WEB', action: () => document.getElementById('mqtt-monitor-window').classList.remove('hidden') },
                 ]
             },
             {

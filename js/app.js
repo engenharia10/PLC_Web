@@ -891,10 +891,6 @@ class PLCApp {
             if (statusEl) statusEl.textContent = '✅ Conectado — ' + this.mqttComm.deviceId;
             if (commInd) commInd.textContent = '☁️ WEB Online';
             this.activeComm = 'mqtt';
-            // Abre monitor serial para logs MQTT ficarem visíveis
-            this.showMonitor();
-            // Abre monitor MQTT
-            document.getElementById('mqtt-monitor-window').classList.remove('hidden');
             this.hideCommModal();
             // Arrastar monitor MQTT
             this._makeDraggable(

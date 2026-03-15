@@ -80,11 +80,29 @@ class PLCApp {
         this.theme.setTheme(name);
         this.ladderCanvas.render();
         this.updateProperties();
+        const labels = { light: 'Tema Claro', dark: 'Tema Escuro', ultra_dark: 'Tema Ultra Escuro', super_blue: 'Tema Super Azul' };
+        const lbl = labels[name] || name;
+        const el = document.getElementById('status-theme');
+        if (el) el.textContent = lbl;
+        this._setStatus('🎨 ' + lbl + ' selecionado');
     }
 
     // ===== Model =====
     setModel(model) {
         this.plcType = model;
+        const labels = { 'PLC-Max.': 'ECU Max', 'PLC-Trm': 'ECU TRM' };
+        const lbl = labels[model] || model;
+        const el = document.getElementById('status-model');
+        if (el) el.textContent = lbl;
+        this._setStatus('🖥️ Modelo ' + lbl + ' selecionado');
+    }
+
+    _setStatus(msg, timeout = 3000) {
+        const el = document.getElementById('status-text');
+        if (!el) return;
+        el.textContent = msg;
+        clearTimeout(this._statusTimer);
+        this._statusTimer = setTimeout(() => { el.textContent = 'PLC Ladder Editor — Pronto'; }, timeout);
     }
 
     // ===== Properties =====

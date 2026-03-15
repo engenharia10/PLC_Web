@@ -966,6 +966,7 @@ class PLCApp {
 
         handle.addEventListener('pointerdown', e => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (e.target.closest('button')) return; // não captura cliques em botões dentro do handle
             const r = win.getBoundingClientRect();
             win.style.left   = r.left + 'px';
             win.style.top    = r.top  + 'px';

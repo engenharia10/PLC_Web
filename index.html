@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Editor Ladder PLC — Alfatronic. Editor visual de lógica Ladder para controladores PLC.">
     <title>PLC Ladder Editor — Alfatronic</title>
-    <link rel="stylesheet" href="css/styles.css?v=18">
+    <link rel="stylesheet" href="css/styles.css?v=19">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -103,25 +103,27 @@
                     <!-- MQTT Tab -->
                     <div id="panel-mqtt" class="tab-panel" style="display:none;">
                         <div class="config-row">
-                            <label>Broker Host:</label>
+                            <label>Broker:</label>
                             <select id="mqtt-host" style="width:100%;padding:4px;box-sizing:border-box;">
                                 <option value="04ee441e0bb24887aeb3cb2467b2743c.s1.eu.hivemq.cloud">HiveMQ Cloud (Produção)</option>
-                                <option value="broker.emqx.io">EMQX Public (Teste/Fallback)</option>
+                                <option value="broker.emqx.io">EMQX Public (Teste — sem senha)</option>
                             </select>
                         </div>
-                        <div class="config-row">
-                            <label>Usuário:</label>
-                            <input id="mqtt-user" type="text" style="width:100%;padding:4px;box-sizing:border-box;" value="PLC-web">
-                        </div>
-                        <div class="config-row">
-                            <label>Senha:</label>
-                            <div style="display:flex;gap:4px;width:100%;">
-                                <input id="mqtt-pass" type="password" style="flex:1;padding:4px;box-sizing:border-box;">
-                                <button type="button" id="mqtt-pass-toggle" title="Mostrar/ocultar senha" style="padding:4px 8px;background:#334155;border:1px solid #475569;border-radius:4px;color:#94a3b8;cursor:pointer;font-size:13px;">👁</button>
+                        <div id="mqtt-auth-row">
+                            <div class="config-row">
+                                <label>Usuário:</label>
+                                <input id="mqtt-user" type="text" style="width:100%;padding:4px;box-sizing:border-box;" value="PLC-web">
+                            </div>
+                            <div class="config-row">
+                                <label>Senha:</label>
+                                <div style="display:flex;gap:4px;width:100%;">
+                                    <input id="mqtt-pass" type="password" style="flex:1;padding:4px;box-sizing:border-box;">
+                                    <button type="button" id="mqtt-pass-toggle" title="Mostrar/ocultar senha" style="padding:4px 8px;background:#334155;border:1px solid #475569;border-radius:4px;color:#94a3b8;cursor:pointer;font-size:13px;">👁</button>
+                                </div>
                             </div>
                         </div>
                         <div class="config-row">
-                            <label>Device ID (MAC):</label>
+                            <label>Device ID:</label>
                             <input id="mqtt-device-id" type="text" style="width:100%;padding:4px;box-sizing:border-box;" placeholder="Ex: 1C9DC2633298">
                         </div>
                         <div class="action-row">
@@ -143,6 +145,7 @@
             <div style="display:flex;gap:6px;align-items:center;">
                 <span id="mqtt-pkt-count" style="color:#64748b;font-size:11px;font-family:monospace;">pkt:0</span>
                 <span id="mqtt-monitor-rtc" style="color:#94a3b8;font-size:11px;"></span>
+                <button id="mqtt-test-btn" disabled style="background:#1e3a5f;border:1px solid #334155;border-radius:4px;color:#38bdf8;font-size:11px;cursor:pointer;padding:2px 7px;" title="Loopback: envia ST: para si mesmo — testa recepção sem ESP32">📡 Teste</button>
                 <button id="mqtt-monitor-close" style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:0 4px;">×</button>
             </div>
         </div>
@@ -210,7 +213,7 @@
     <!-- Scripts (ordem importa) -->
     <script src="js/mqtt.min.js"></script>
     <script>console.log('[MQTT LIB]', typeof mqtt !== 'undefined' ? 'OK' : 'FALHOU — lib não carregou');</script>
-    <script src="js/mqtt_comm.js?v=7"></script>
+    <script src="js/mqtt_comm.js?v=9"></script>
     <script src="js/plc_protocol.js?v=8"></script>
     <script src="js/serial_comm.js?v=8"></script>
     <script src="js/ble_comm.js?v=8"></script>
@@ -221,7 +224,7 @@
     <script src="js/canvas.js?v=19"></script>
     <script src="js/properties.js?v=13"></script>
     <script src="js/toolbar.js?v=16"></script>
-    <script src="js/app.js?v=38"></script>
-    <script src="js/pwa.js?v=14"></script>
+    <script src="js/app.js?v=39"></script>
+    <script src="js/pwa.js?v=15"></script>
 </body>
 </html>

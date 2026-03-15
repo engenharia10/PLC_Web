@@ -3,7 +3,7 @@
  * Estratégia: Cache-First com fallback para rede
  */
 
-const CACHE_NAME = 'plc-editor-v40';
+const CACHE_NAME = 'plc-editor-v43';
 
 const ASSETS_TO_CACHE = [
     './',
@@ -26,6 +26,11 @@ const ASSETS_TO_CACHE = [
     './icons/icon-512.png',
     './manifest.json'
 ];
+
+// Permite que pwa.js force atualização imediata
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
 // Install — pre-cache de todos os assets
 self.addEventListener('install', (event) => {

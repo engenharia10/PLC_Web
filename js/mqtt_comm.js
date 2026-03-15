@@ -1,4 +1,4 @@
-// mqtt_comm.js v=4
+// mqtt_comm.js v=8
 // Cliente MQTT (WebSocket) para HiveMQ Cloud + parser ST: telemetria
 
 class MQTTComm {
@@ -56,18 +56,21 @@ class MQTTComm {
 
         this._log(`Conectando: ${url}`);
 
-        this.client = mqtt.connect(url, {
+        // Igual ao MQTT_Test que funcionou no Android:
+        // não enviar username/password vazios — alguns brokers rejeitam silenciosamente
+        const opts = {
             clientId,
-            username: user,
-            password: pass,
             clean: true,
-            reconnectPeriod: 2000,     // Auto-reconecta (Android Chrome suspende abas)
+            reconnectPeriod: 0,        // Sem auto-reconecta — evita race condition na subscription
             connectTimeout: 15000,
             protocolVersion: 4,        // MQTT 3.1.1
             protocolId: 'MQTT',
             keepalive: 60,
             rejectUnauthorized: false
-        });
+        };
+        if (user) { opts.username = user; opts.password = pass; }
+
+        this.client = mqtt.connect(url, opts);
 
         // Timeout visível: se em 15s nada acontecer, avisa o usuário
         this._connTimeout = setTimeout(() => {
@@ -124,6 +127,21 @@ class MQTTComm {
         clearTimeout(this._connTimeout);
         if (this.client) { this.client.end(true); this.client = null; }
         this.isConnected = false;
+    }
+
+    // Loopback: publica mensagem ST: no próprio topicRx para testar recepção sem o ESP32
+    sendTest() {
+        if (!this.isConnected || !this.topicRx) return;
+        const testMsg = 'ST:I:0FQ:03N0:1234\n';
+        const bytes = new TextEncoder().encode(testMsg);
+        let payload;
+        if (typeof mqtt !== 'undefined' && mqtt.Buffer && mqtt.Buffer.from) {
+            payload = mqtt.Buffer.from(bytes);
+        } else {
+            payload = bytes;
+        }
+        this._log('📡 Teste loopback → ' + this.topicRx);
+        this.client.publish(this.topicRx, payload, { qos: 1 });
     }
 
     send(dataBytes) {

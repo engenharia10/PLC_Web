@@ -77,7 +77,7 @@ class MQTTComm {
         this.client.on('connect', () => {
             clearTimeout(this._connTimeout);
             this.isConnected = true;
-            this.client.subscribe(this.topicRx, { qos: 0 }, (err) => {
+            this.client.subscribe(this.topicRx, { qos: 1 }, (err) => {
                 if (err) this._log(`❌ Subscribe falhou: ${err.message}`);
                 else     this._log(`📥 Inscrito: ${this.topicRx}`);
             });
@@ -124,7 +124,15 @@ class MQTTComm {
 
     send(dataBytes) {
         if (!this.isConnected || !this.topicTx) return;
-        const payload = dataBytes instanceof Uint8Array ? dataBytes : new Uint8Array(dataBytes);
+        // Fix para Android Chrome: mqtt.js prefere `Buffer` polifilado em vez de Uint8Array puro
+        // Algumas versões do Chrome mobile falham silenciosamente ao enviar Uint8Array pelo WSS do mqtt.js
+        let payload;
+        if (typeof mqtt !== 'undefined' && mqtt.Buffer && mqtt.Buffer.from) {
+            payload = mqtt.Buffer.from(dataBytes);
+        } else {
+            payload = dataBytes instanceof Uint8Array ? dataBytes : new Uint8Array(dataBytes);
+        }
+        
         this.client.publish(this.topicTx, payload, { qos: 1 });
     }
 

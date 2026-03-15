@@ -74,7 +74,10 @@ class MQTTComm {
         this.client.on('connect', () => {
             clearTimeout(this._connTimeout);
             this.isConnected = true;
-            this.client.subscribe(this.topicRx, { qos: 0 });
+            this.client.subscribe(this.topicRx, { qos: 0 }, (err) => {
+                if (err) this._log(`❌ Subscribe falhou: ${err.message}`);
+                else     this._log(`📥 Inscrito: ${this.topicRx}`);
+            });
             this._log(`✅ Conectado | Device: ${this.deviceId}`);
             if (this.onConnected) this.onConnected();
         });

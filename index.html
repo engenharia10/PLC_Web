@@ -137,12 +137,15 @@
     <!-- Monitor MQTT — janela flutuante -->
     <div id="mqtt-monitor-window" class="hidden" style="position:fixed;bottom:20px;right:20px;width:520px;height:420px;background:#1e293b;border:1px solid #334155;border-radius:8px;z-index:1000;display:flex;flex-direction:column;box-shadow:0 4px 24px #0008;">
         <div id="mqtt-monitor-titlebar" style="padding:8px 12px;background:#0f172a;border-radius:8px 8px 0 0;cursor:move;display:flex;justify-content:space-between;align-items:center;user-select:none;">
-            <span style="color:#38bdf8;font-weight:bold;font-size:13px;">☁️ Monitor WEB — PLC Online</span>
+            <span style="color:#38bdf8;font-weight:bold;font-size:13px;">☁️ Monitor WEB</span>
             <div style="display:flex;gap:6px;align-items:center;">
+                <span id="mqtt-pkt-count" style="color:#64748b;font-size:11px;font-family:monospace;">pkt:0</span>
                 <span id="mqtt-monitor-rtc" style="color:#94a3b8;font-size:11px;"></span>
                 <button id="mqtt-monitor-close" style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:0 4px;">×</button>
             </div>
         </div>
+        <!-- Raw preview: última mensagem recebida -->
+        <div id="mqtt-raw-bar" style="padding:2px 12px;background:#0a0f1a;font-size:10px;font-family:monospace;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;">aguardando dados...</div>
         <div style="padding:10px;overflow-y:hidden;flex:1;display:flex;flex-direction:column;gap:8px;">
 
             <!-- I/O Row -->
@@ -215,7 +218,7 @@
     <script src="js/canvas.js?v=19"></script>
     <script src="js/properties.js?v=13"></script>
     <script src="js/toolbar.js?v=16"></script>
-    <script src="js/app.js?v=35"></script>
+    <script src="js/app.js?v=36"></script>
     <script src="js/pwa.js?v=14"></script>
 </body>
 </html>

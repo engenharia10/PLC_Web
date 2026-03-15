@@ -920,6 +920,25 @@ class PLCApp {
 
         this.mqttComm.onData = (bytes) => {
             this.handleCommRX(bytes);
+            // Contador de pacotes brutos — diagnóstico de recepção
+            const cntEl = document.getElementById('mqtt-pkt-count');
+            if (cntEl) {
+                const n = (parseInt(cntEl.dataset.n || '0') + 1);
+                cntEl.dataset.n = n;
+                cntEl.textContent = `pkt:${n}`;
+                cntEl.style.color = '#4ade80';
+                setTimeout(() => { cntEl.style.color = '#64748b'; }, 400);
+            }
+            // Preview raw da última mensagem
+            const rawBar = document.getElementById('mqtt-raw-bar');
+            if (rawBar) {
+                try {
+                    const txt = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+                    rawBar.textContent = txt.slice(0, 120);
+                    rawBar.style.color = '#4ade80';
+                    setTimeout(() => { rawBar.style.color = '#334155'; }, 600);
+                } catch (_) { rawBar.textContent = `[${bytes.length} bytes]`; }
+            }
         };
 
         connBtn.onclick = () => {

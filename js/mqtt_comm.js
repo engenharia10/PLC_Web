@@ -86,9 +86,14 @@ class MQTTComm {
         });
 
         this.client.on('message', (topic, message) => {
+            const bytes = message instanceof Uint8Array ? message : new Uint8Array(message);
+            const text  = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+            this._log(`📨 msg [${bytes.length}b] ${text.slice(0, 60)}`);
             if (topic === this.topicRx) {
-                if (this.onData) this.onData(message);
-                this._processRaw(new TextDecoder('utf-8', { fatal: false }).decode(message));
+                if (this.onData) this.onData(bytes);
+                this._processRaw(text);
+            } else {
+                this._log(`(tópico ignorado: ${topic})`);
             }
         });
 

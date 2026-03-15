@@ -679,7 +679,7 @@ class LadderCanvas {
                 ctx.font = 'bold 9px "Segoe UI"';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillText(String(el._liveVal), x, y - 18);
+                ctx.fillText(String(el._liveVal), x, y - 28);
             }
         }
     }

@@ -927,16 +927,6 @@ class PLCApp {
                 cntEl.style.color = '#4ade80';
                 setTimeout(() => { cntEl.style.color = '#64748b'; }, 400);
             }
-            // Preview raw da última mensagem
-            const rawBar = document.getElementById('mqtt-raw-bar');
-            if (rawBar) {
-                try {
-                    const txt = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-                    rawBar.textContent = txt.slice(0, 120);
-                    rawBar.style.color = '#4ade80';
-                    setTimeout(() => { rawBar.style.color = '#334155'; }, 600);
-                } catch (_) { rawBar.textContent = `[${bytes.length} bytes]`; }
-            }
         };
 
         connBtn.onclick = () => {

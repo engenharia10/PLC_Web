@@ -178,8 +178,8 @@ class LadderCanvas {
             this._pinchActive = false;
             const touch = e.touches[0];
 
-            // Permite pull-to-refresh: toque único, canvas no topo, toque perto do topo da tela
-            this._allowPTR = (this.scrollY <= 1 && touch.clientY < 80);
+            // Permite pull-to-refresh: toque único, canvas no topo, toque na metade superior da tela
+            this._allowPTR = (this.scrollY <= 1 && touch.clientY < window.innerHeight * 0.5);
             if (!this._allowPTR) e.preventDefault();
 
             const simEl = { clientX: touch.clientX, clientY: touch.clientY };

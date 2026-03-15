@@ -38,19 +38,15 @@
     --st-fg: #9CDCFE;
 }
 
-html {
+html, body {
     height: 100%;
     width: 100%;
-    /* Sem overflow:hidden — permite overscroll no root (pull-to-refresh Android) */
-    overscroll-behavior-y: auto;
+    margin: 0;
+    padding: 0;
+    overscroll-behavior-y: auto; /* permite pull-to-refresh no Android Chrome */
 }
 
 body {
-    position: fixed;  /* impede scroll real, mas html pode overscrollar */
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
     font-family: 'Inter', 'Segoe UI', sans-serif;
     background: var(--bg-dark);
     color: var(--text-color);
@@ -67,7 +63,7 @@ body {
     flex-direction: column;
     height: 100vh;
     width: 100vw;
-    overflow: hidden;
+    overflow: clip; /* clip não cria scroll container → pull-to-refresh funciona */
 }
 
 /* ===== Menu Bar ===== */

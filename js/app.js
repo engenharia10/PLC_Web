@@ -592,6 +592,7 @@ class PLCApp {
                     if (this.mqttComm && this._bleRxBuf.includes('ST:')) {
                         this.mqttComm._processRaw(this._bleRxBuf);
                         this._applyMQTTToCanvas({ ...this.mqttComm.state });
+                        this.ladderCanvas.render(); // força render (evita "changed=false" após STOP)
                     }
                     const cut = this._bleRxBuf.lastIndexOf('\n');
                     this._bleRxBuf = this._bleRxBuf.substring(cut + 1);

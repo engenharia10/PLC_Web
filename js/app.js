@@ -584,13 +584,11 @@ class PLCApp {
                 }
                 // Acumula chunks BLE (20 bytes cada) e processa quando linha completa
                 this._bleRxBuf = (this._bleRxBuf || '') + text;
-                if (this._bleRxBuf.includes('\n')) {
+                if (this.simulationRunning && this._bleRxBuf.includes('\n')) {
                     if (this.mqttComm && this._bleRxBuf.includes('ST:')) {
-                        // Parseia via mqttComm (atualiza state) e aplica canvas diretamente
                         this.mqttComm._processRaw(this._bleRxBuf);
                         this._applyMQTTToCanvas({ ...this.mqttComm.state });
                     }
-                    // Mantém apenas fragmento incompleto da última linha
                     const cut = this._bleRxBuf.lastIndexOf('\n');
                     this._bleRxBuf = this._bleRxBuf.substring(cut + 1);
                 }

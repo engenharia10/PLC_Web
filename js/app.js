@@ -9,6 +9,7 @@ class PLCApp {
         this.branches = [];
         this.selectedElement = null;
         this.simulationRunning = false;
+        this._bleBlocked = false;  // true somente após STOP explícito; limpa no START ou reconexão BLE
         this.plcType = 'PLC-Max.';
 
         // Theme
@@ -139,6 +140,7 @@ class PLCApp {
         }
         // Ticker local para elementos RTC (atualiza hora do sistema a cada 1s)
         if (this.simulationRunning) {
+            this._bleBlocked = false;  // START: libera exibição BLE
             this._rtcTicker = setInterval(() => {
                 if (!this.activeComm) {
                     const now = new Date();
@@ -156,6 +158,7 @@ class PLCApp {
                 }
             }, 1000);
         } else {
+            this._bleBlocked = true;   // STOP: bloqueia exibição BLE
             clearInterval(this._rtcTicker);
             // Apaga valores e cores de TODOS os elementos ao parar
             for (const el of this.elements) {
@@ -481,6 +484,7 @@ class PLCApp {
             this.bleComm.onConnect = () => {
                 this.activeComm = 'ble';
                 this._bleRxBuf = '';
+                this._bleBlocked = false;  // nova conexão: libera exibição
                 btnConnectBle.disabled = true;
                 btnDisconnectBle.disabled = false;
                 this.updateCommStatusIndicator();
@@ -584,7 +588,7 @@ class PLCApp {
                 }
                 // Acumula chunks BLE (20 bytes cada) e processa quando linha completa
                 this._bleRxBuf = (this._bleRxBuf || '') + text;
-                if (this.simulationRunning && this._bleRxBuf.includes('\n')) {
+                if (!this._bleBlocked && this._bleRxBuf.includes('\n')) {
                     if (this.mqttComm && this._bleRxBuf.includes('ST:')) {
                         this.mqttComm._processRaw(this._bleRxBuf);
                         this._applyMQTTToCanvas({ ...this.mqttComm.state });

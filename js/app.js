@@ -467,6 +467,7 @@ class PLCApp {
 
             this.bleComm.onConnect = () => {
                 this.activeComm = 'ble';
+                this._bleRxBuf = '';
                 btnConnectBle.disabled = true;
                 btnDisconnectBle.disabled = false;
                 this.updateCommStatusIndicator();
@@ -555,23 +556,28 @@ class PLCApp {
     }
 
     handleCommRX(dataBytes) {
-        // Exibe binário / texto de forma simples no monitor
-        // Em um formato real, a decodificação dos pacotes de telemetria
-        // [0xBB, 0x66, SIZE_L, SIZE_H, ...] aconteceria aqui.
         const header = dataBytes.length >= 2 ? (dataBytes[0] === PLCProtocol.STATUS_MAGIC1 && dataBytes[1] === PLCProtocol.STATUS_MAGIC2) : false;
-        
+
         if (header) {
             this.logComm(`[RX Status Packet]: ${dataBytes.length} bytes`);
         } else {
-            const decoder = new TextDecoder();
-            const text = decoder.decode(dataBytes);
+            const text = new TextDecoder('utf-8', { fatal: false }).decode(dataBytes);
             if (text.trim() || dataBytes.length > 0) {
-                // Remove caracteres nao imprimiveis
                 const cleanText = text.replace(/[\x00-\x09\x0B-\x1F\x7F-\x9F]/g, '');
                 if (cleanText) {
                     this.logComm(`< [RX Text]: ${cleanText}`);
                 } else {
                     this.logComm(`< [RX Hex]: ${PLCProtocol.bytesToHex(dataBytes)}`);
+                }
+                // Acumula chunks BLE (20 bytes cada) e processa quando linha completa
+                this._bleRxBuf = (this._bleRxBuf || '') + text;
+                if (this._bleRxBuf.includes('\n')) {
+                    if (this.mqttComm && this._bleRxBuf.includes('ST:')) {
+                        this.mqttComm._processRaw(this._bleRxBuf);
+                    }
+                    // Mantém apenas fragmento incompleto da última linha
+                    const cut = this._bleRxBuf.lastIndexOf('\n');
+                    this._bleRxBuf = this._bleRxBuf.substring(cut + 1);
                 }
             }
         }

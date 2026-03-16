@@ -157,8 +157,21 @@ class PLCApp {
             }, 1000);
         } else {
             clearInterval(this._rtcTicker);
+            // Apaga valores e cores de TODOS os elementos ao parar
             for (const el of this.elements) {
-                if (el.type === 'rtc') { el._liveVal = undefined; el._active = false; }
+                el._liveVal = undefined;
+                el._active  = false;
+            }
+            // Limpa buffer BLE e estado MQTT para não exibir dados obsoletos
+            this._bleRxBuf = '';
+            if (this.mqttComm) {
+                const s = this.mqttComm.state;
+                s.inputs = 0; s.outputs = 0;
+                s.timers_ton = []; s.timers_toff = [];
+                s.ctu = []; s.ctd = []; s.cmp = [];
+                s.vars = []; s.math = [];
+                s.adc = []; s.pot = []; s.joy = [];
+                s.rtc = '';
             }
             this.ladderCanvas.render();
         }

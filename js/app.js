@@ -978,7 +978,7 @@ class PLCApp {
 
         this.mqttComm.onStateUpdate = (state) => {
             this._renderMQTTState(state);
-            this._applyMQTTToCanvas(state);
+            if (this.simulationRunning) this._applyMQTTToCanvas(state);
         };
 
         this.mqttComm.onData = (bytes) => {

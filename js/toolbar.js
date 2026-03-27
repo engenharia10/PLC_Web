@@ -60,16 +60,22 @@ class Toolbar {
                 ]
             },
             {
+                label: '🔵 Script', items: [
+                    { label: '🔵 Editor de Script', shortcut: 'Ctrl+J', action: () => this.app.showScriptPanel() },
+                    { label: '⬛ Editor Ladder',    shortcut: 'Ctrl+L', action: () => this.app.showLadderView() },
+                ]
+            },
+            {
                 label: '🔌 PLC', items: [
                     { label: '▶️ Iniciar/Parar Simulador', shortcut: 'F5', action: () => this.app.toggleSimulation() },
+                    { type: 'separator' },
+                    { label: '⬆️ Transferir Programa', action: () => this.app.uploadToPLC() },
+                    { label: '🔄 Atualizar Firmware (Boot)', action: () => this.app.showFirmwareUpdateModal() },
                 ]
             },
             {
                 label: '📡 Comunicação', items: [
-                    { label: '🔌 Conectar PLC (Serial)', action: () => this.app.showCommModal() },
-                    { label: '📶 Conectar PLC (BLE)', action: () => this.app.showCommModal() },
-                    { type: 'separator' },
-                    { label: '⬆️ Transferir Programa', action: () => this.app.uploadToPLC() },
+                    { label: '🔌 Conectar PLC', action: () => this.app.showCommModal() },
                     { type: 'separator' },
                     { label: '🖥️ Monitor Serial', action: () => this.app.showMonitor() },
                     { label: '☁️ Monitor WEB', action: () => document.getElementById('mqtt-monitor-window').classList.remove('hidden') },

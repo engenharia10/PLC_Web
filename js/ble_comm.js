@@ -24,7 +24,7 @@ class BLEComm {
     }
 
     get isAvailable() {
-        return navigator.bluetooth && true;
+        return typeof navigator !== 'undefined' && !!navigator.bluetooth;
     }
 
     async connect() {
@@ -33,13 +33,23 @@ class BLEComm {
         }
 
         try {
-            // Solicita permissão e emparelhamento
-            this.device = await navigator.bluetooth.requestDevice({
-                filters: [{ services: [this.SERVICE_UUID] }],
-                optionalServices: [this.SERVICE_UUID]
-                // Você também pode filtrar por nome: 
-                // filters: [{ namePrefix: "ESP32" }], optionalServices: [this.SERVICE_UUID]
-            });
+            // 1) Tentativa estrita por serviço NUS
+            try {
+                this.device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [this.SERVICE_UUID] }],
+                    optionalServices: [this.SERVICE_UUID]
+                });
+            } catch (strictError) {
+                // 2) Fallback: alguns firmwares não anunciam o serviço no advertising.
+                if (strictError && strictError.name === 'NotFoundError') {
+                    this.device = await navigator.bluetooth.requestDevice({
+                        acceptAllDevices: true,
+                        optionalServices: [this.SERVICE_UUID]
+                    });
+                } else {
+                    throw strictError;
+                }
+            }
 
             this.device.addEventListener('gattserverdisconnected', this.handleDisconnection.bind(this));
 
@@ -122,13 +132,39 @@ class BLEComm {
             throw new Error("Tipo de dado não suportado para envio BLE");
         }
 
-        const max_chunk = 20; // MTU Limite conservador para BLE regular
+        const max_chunk = 512; // MTU negociado via BLEDevice::setMTU(517) no ESP32
 
         for (let i = 0; i < arrayData.length; i += max_chunk) {
             const chunk = arrayData.slice(i, i + max_chunk);
             await this.rxCharacteristic.writeValueWithoutResponse(chunk);
-            // Pequeno atraso pode ser necessário dependendo do stack do sistema
-            await new Promise(r => setTimeout(r, 10)); 
+            // 50ms: ESP32 NUS processa e encaminha para UART antes do próximo chunk.
+            // 20ms era insuficiente sob congestionamento BLE — causava CRC fail no bootloader.
+            await new Promise(r => setTimeout(r, 50));
+        }
+    }
+
+    /**
+     * Envio rápido para BLUP — delay menor entre chunks.
+     * O ESP32 acumula os dados e encaminha em bloco para a UART.
+     */
+    async sendFast(data) {
+        if (!this.isConnected || !this.rxCharacteristic) {
+            throw new Error("BLE não está conectado.");
+        }
+
+        let arrayData;
+        if (data instanceof Uint8Array) arrayData = data;
+        else if (Array.isArray(data)) arrayData = new Uint8Array(data);
+        else throw new Error("Tipo de dado não suportado para envio BLE");
+
+        const max_chunk = 20; // MTU conservador para compatibilidade ampla
+        const chunks = Math.ceil(arrayData.length / max_chunk);
+        for (let i = 0; i < arrayData.length; i += max_chunk) {
+            const chunk = arrayData.slice(i, i + max_chunk);
+            await this.rxCharacteristic.writeValueWithoutResponse(chunk);
+            // Gap curto para alta taxa sem saturar stacks BLE mais sensíveis.
+            const isLast = (i + max_chunk >= arrayData.length);
+            if (!isLast) await new Promise(r => setTimeout(r, 5));
         }
     }
 
@@ -136,3 +172,4 @@ class BLEComm {
         await this.send(text + "\n");
     }
 }
+

@@ -9,6 +9,7 @@ class PLCApp {
         this.branches = [];
         this.selectedElement = null;
         this.simulationRunning = false;
+        this.elkScript = "";
         this._bleBlocked = false;  // true somente após STOP explícito; limpa no START ou reconexão BLE
         this.plcType = 'PLC-Max.';
 
@@ -201,6 +202,11 @@ class PLCApp {
         this.rungs = [];
         this.branches = [];
         this.selectedElement = null;
+        this.elkScript = "";
+        const ta = document.getElementById('script-editor-ta');
+        if (ta) ta.value = "";
+        // Volta para view ladder se estava no editor de script
+        if (this._activeView === 'script') this.showLadderView();
         this.addRung();
         this.updateProperties();
     }
@@ -259,6 +265,7 @@ class PLCApp {
             "Gerado:": "Editor Ladder Alfatronic Web",
             "Data:": dateStr,
             plc_type: this.plcType,
+            lua_script: this.elkScript || "",
             routines: [{
                 rungs: this.rungs.map(r => {
                     // Branches desta rung
@@ -309,6 +316,11 @@ class PLCApp {
 
         // Carrega plc_type se presente
         if (data.plc_type) this.plcType = data.plc_type;
+
+        // Carrega script Elk JS se presente
+        this.elkScript = data.lua_script || "";
+        const ta = document.getElementById('script-editor-ta');
+        if (ta) ta.value = this.elkScript;
 
         const seenIds = new Set();
 
@@ -386,6 +398,12 @@ class PLCApp {
             } else if (e.ctrlKey && e.key === 'r') {
                 e.preventDefault();
                 this.addRung();
+            } else if (e.ctrlKey && e.key === 'j') {
+                e.preventDefault();
+                this.showScriptPanel();
+            } else if (e.ctrlKey && e.key === 'l') {
+                e.preventDefault();
+                this.showLadderView();
             }
         });
     }
@@ -506,13 +524,19 @@ class PLCApp {
                     this.logComm("Iniciando Scan BLE...");
                     await this.bleComm.connect();
                 } catch (e) {
-                    this.logComm(`Falha BLE: ${e.message}`);
+                    const msg = e && e.message ? e.message : String(e);
+                    this.logComm(`Falha BLE: ${msg}`);
+                    if (e && e.name === 'NotFoundError') {
+                        this.logComm("Dica: nenhum dispositivo selecionado/encontrado. Verifique se o BLE está anunciando.");
+                    } else if (e && e.name === 'SecurityError') {
+                        this.logComm("Dica: Web BLE exige contexto seguro (https:// ou localhost) e gesto do usuário.");
+                    }
                 }
             };
             btnDisconnectBle.onclick = () => this.bleComm.disconnect();
         } else {
             document.getElementById('ble-connect-btn').disabled = true;
-            this.logComm('Aviso: Web Bluetooth não suportado no seu navegador.');
+            this.logComm('Aviso: Web Bluetooth indisponível. No Brave, verifique flags/permissões de Bluetooth e use https:// ou localhost.');
         }
     }
 
@@ -636,7 +660,7 @@ class PLCApp {
         try {
             this.logComm(`> Preparando UPLOAD: Serializando Ladder...`);
             this.logComm(`> [DEBUG] Elements: ${this.elements.length} | Rungs: ${this.rungs.length}`);
-            let payloadData = this.serializer.serialize(this.elements, this.rungs);
+            let payloadData = this.serializer.serialize(this.elements, this.rungs, this.elkScript);
 
             let packet = PLCProtocol.createLoadProgramPacket(payloadData);
             this.logComm(`> Pacote montado: ${packet.length} bytes.`);
@@ -795,7 +819,7 @@ class PLCApp {
     async saveBin() {
         if (!this.serializer) { alert("Módulo de serialização não carregado."); return; }
         try {
-            const payloadData = this.serializer.serialize(this.elements, this.rungs);
+            const payloadData = this.serializer.serialize(this.elements, this.rungs, this.elkScript);
             let packet = PLCProtocol.createLoadProgramPacket(payloadData);
 
             if (await this._confirmSimNao("Deseja proteger o arquivo .bin com senha?")) {
@@ -893,6 +917,210 @@ class PLCApp {
             }
         };
         input.click();
+    }
+
+    // ===== Atualizar Firmware via BLUP (boot serial) =====
+    showFirmwareUpdateModal() {
+        const modal      = document.getElementById('fw-update-modal');
+        const dropZone   = document.getElementById('fw-drop-zone');
+        const fileInput  = document.getElementById('fw-file-input');
+        const fileName   = document.getElementById('fw-file-name');
+        const progBar    = document.getElementById('fw-progress-bar');
+        const progTxt    = document.getElementById('fw-progress-text');
+        const bytesInfo  = document.getElementById('fw-bytes-info');
+        const logDiv     = document.getElementById('fw-log');
+        const sendBtn    = document.getElementById('fw-send-btn');
+        const cancelBtn  = document.getElementById('fw-cancel-btn');
+        const statusIcon = document.getElementById('fw-status-icon');
+        const statusMsg  = document.getElementById('fw-status-msg');
+
+        const manualInput = document.getElementById('fw-manual-input');
+        const manualSend  = document.getElementById('fw-manual-send');
+
+        const doManualSend = async () => {
+            const txt = manualInput.value;
+            if (!txt) return;
+            try {
+                const bytes = new TextEncoder().encode(txt);
+                if (this.activeComm === 'ble' && this.bleComm?.isConnected) {
+                    await this.bleComm.send(bytes);
+                } else if (this.activeComm === 'serial' && this.serialComm?.isConnected) {
+                    await this.serialComm.send(bytes);
+                } else if (blup?._bleComm) {
+                    await blup._bleComm.send(bytes);
+                } else if (blup?._port) {
+                    await blup._write(bytes);
+                }
+                addLog(`> TX manual: ${txt}`, '#94a3b8');
+                manualInput.value = '';
+            } catch(e) { addLog(`Erro TX manual: ${e.message}`, '#f87171'); }
+        };
+        manualSend.onclick = doManualSend;
+        manualInput.addEventListener('keydown', e => { if (e.key === 'Enter') doManualSend(); });
+
+        let fileData = null;
+        let busy = false;
+        let blup = null;
+
+        // ── Reset visual ────────────────────────────────────────────────────
+        const reset = () => {
+            progBar.style.width = '0%';
+            progBar.style.background = 'linear-gradient(90deg,#2563eb,#60a5fa)';
+            progTxt.textContent = '0%';
+            bytesInfo.textContent = '';
+            logDiv.value = '';
+            fileName.textContent = '';
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = '0.4';
+            statusIcon.textContent = '⏳';
+            statusMsg.textContent = 'Selecione o arquivo .bin do firmware.';
+            statusMsg.style.color = '#94a3b8';
+        };
+        reset();
+        modal.style.display = 'flex';
+
+        const setStatus = (icon, msg, color = '#94a3b8') => {
+            statusIcon.textContent = icon;
+            statusMsg.textContent = msg;
+            statusMsg.style.color = color;
+        };
+
+        const addLog = (msg, color = '#94a3b8') => {
+            const ts = new Date().toLocaleTimeString();
+            logDiv.value += `[${ts}] ${msg}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+
+        const setProgress = (sent, total) => {
+            const pct = total > 0 ? Math.round(sent / total * 100) : 0;
+            progBar.style.width = pct + '%';
+            progTxt.textContent = pct + '%';
+            bytesInfo.textContent = `${sent.toLocaleString()} / ${total.toLocaleString()} bytes`;
+        };
+
+        const runBlup = async () => {
+            setStatus('🔄', 'Iniciando BLUP...', '#60a5fa');
+            addLog('Iniciando transferência BLUP...', '#60a5fa');
+            const total = fileData.length;
+            try {
+                await blup.send(fileData, 'firmware.bin', setProgress, addLog, setStatus);
+                // SUCESSO
+                progBar.style.width = '100%';
+                progBar.style.background = 'linear-gradient(90deg,#16a34a,#4ade80)';
+                progTxt.textContent = '100%';
+                bytesInfo.textContent = `${total.toLocaleString()} / ${total.toLocaleString()} bytes`;
+                setStatus('✅', 'Firmware gravado com sucesso! MCU reiniciando...', '#4ade80');
+                addLog('✔ Firmware gravado com sucesso! MCU vai reiniciar.', '#4ade80');
+            } finally {
+                await blup.closePort();
+                blup = null;
+            }
+        };
+
+        // ── Seleção de arquivo ──────────────────────────────────────────────
+        const setFile = (file) => {
+            if (!file || !file.name.endsWith('.bin')) { alert('Selecione um arquivo .bin válido.'); return; }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                fileData = new Uint8Array(e.target.result);
+                fileName.textContent = `📄 ${file.name} — ${fileData.length.toLocaleString()} bytes`;
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = '1';
+                setStatus('📂', `${file.name} — ${fileData.length.toLocaleString()} bytes`, '#4ade80');
+                addLog(`Arquivo: ${file.name} (${fileData.length} bytes)`, '#4ade80');
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        dropZone.onclick = () => fileInput.click();
+        fileInput.onchange = () => setFile(fileInput.files[0]);
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = '#60a5fa'; };
+        dropZone.ondragleave = () => { dropZone.style.borderColor = '#475569'; };
+        dropZone.ondrop = (e) => { e.preventDefault(); dropZone.style.borderColor = '#475569'; setFile(e.dataTransfer.files[0]); };
+
+        cancelBtn.onclick = async () => {
+            if (busy && blup) { try { await blup.closePort(); } catch(_){} }
+            modal.style.display = 'none';
+        };
+
+        // ── Botão "Atualizar" — tudo automático em um clique ────────────────
+        sendBtn.onclick = async () => {
+            if (!fileData || busy) return;
+            busy = true;
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = '0.4';
+            progBar.style.background = 'linear-gradient(90deg,#2563eb,#60a5fa)';
+            setProgress(0, fileData.length);
+
+            try {
+                const CMD_REMOTE_BOOT = new Uint8Array([0xA5, 0x66, 0x01, 0x0D, 0x0A]);
+
+                blup = new BlupSender();
+
+                if (this.activeComm === 'ble' && this.bleComm?.isConnected) {
+                    // ── BLE: registrar listener ANTES de enviar boot ──────────
+                    // A conexão BLE (ESP32 ↔ browser) NÃO é afetada pelo reset do STM32.
+                    // O ESP32 UART recupera automaticamente após framing errors do reset.
+                    // txCharacteristic já está com startNotifications() ativo —
+                    // openBLE() substitui onDataReceived para redirecionar bytes ao blup.
+
+                    blup.openBLE(this.bleComm);
+
+                    setStatus('📡', 'Enviando boot via BLE...', '#fbbf24');
+                    addLog('Enviando CMD_REMOTE_BOOT via BLE...', '#fbbf24');
+                    await this.bleComm.send(CMD_REMOTE_BOOT);
+                    addLog('CMD_REMOTE_BOOT enviado. Aguardando reset STM32...', '#94a3b8');
+
+                    // Aguarda 2000ms para drenar notificações BLE em trânsito do protocolo
+                    // PLC (que podem conter 0x15=NAK ou 0x06=ACK como bytes de dados) e
+                    // para o STM32 completar o reset + delay interno do bootloader (500ms).
+                    await new Promise(r => setTimeout(r, 2000));
+                    blup._rxBuf = [];
+                    addLog('Buffer limpo. Bootloader fica pronto em ~500-900ms...', '#94a3b8');
+                    setStatus('⏳', 'Aguardando handshake do bootloader...', '#94a3b8');
+
+                } else if (this.activeComm === 'serial' && this.serialComm?.isConnected) {
+                    // ── Serial: boot + BLUP via Serial ─────────────────────
+                    setStatus('📡', 'Enviando boot via Serial...', '#fbbf24');
+                    addLog('Enviando CMD_REMOTE_BOOT via Serial...', '#fbbf24');
+                    await this.serialComm.send(CMD_REMOTE_BOOT);
+                    setStatus('⏳', 'Aguardando bootloader iniciar (2s)...', '#94a3b8');
+                    addLog('Aguardando bootloader iniciar...', '#94a3b8');
+                    await new Promise(r => setTimeout(r, 2000));
+                    // Libera o reader do SerialComm antes de passar a porta ao blup
+                    this.serialComm.keepReading = false;
+                    if (this.serialComm.reader) {
+                        try { await this.serialComm.reader.cancel(); } catch(_){}
+                    }
+                    await new Promise(r => setTimeout(r, 150)); // aguarda releaseLock
+                    blup._port = this.serialComm.port;
+                    blup._reading = true;
+                    blup._rxBuf = [];
+                    blup._timeout = 6000;
+                    blup._startReadLoop();
+                    await new Promise(r => setTimeout(r, 80));
+                    addLog('Porta Serial pronta para BLUP.', '#4ade80');
+
+                } else {
+                    // ── Sem conexão: abre Serial manualmente ──────────────────
+                    setStatus('🔌', 'Selecione a porta Serial do PLC...', '#fbbf24');
+                    addLog('Nenhuma conexão ativa — selecione a porta Serial.', '#fbbf24');
+                    await blup.openPort(115200);
+                    addLog('Porta Serial aberta.', '#4ade80');
+                }
+
+                await runBlup();
+
+            } catch (err) {
+                progBar.style.background = 'linear-gradient(90deg,#dc2626,#f87171)';
+                setStatus('❌', `Falha: ${err.message}`, '#f87171');
+                addLog(`✘ ERRO: ${err.message}`, '#f87171');
+            } finally {
+                busy = false;
+                sendBtn.disabled = !fileData;
+                sendBtn.style.opacity = fileData ? '1' : '0.4';
+            }
+        };
     }
 
     // ===== MQTT =====
@@ -1223,9 +1451,69 @@ class PLCApp {
 
         if (changed) this.ladderCanvas.render();
     }
+
+    // ===== Troca de view: ladder ↔ script (estilo QStackedWidget do Python) =====
+    showScriptPanel() {
+        document.getElementById('canvas-area').style.display = 'none';
+        const sa = document.getElementById('script-area');
+        sa.style.display = 'flex';
+        const ta = document.getElementById('script-editor-ta');
+        if (ta) {
+            ta.value = this.elkScript || "";
+            ta.oninput = () => {
+                this.elkScript = ta.value;
+                this._updateScriptByteCount(ta.value);
+            };
+            ta.focus();
+        }
+        this._updateScriptByteCount(this.elkScript || "");
+        const btn = document.getElementById('btn-script-clear');
+        if (btn) btn.onclick = () => this.clearScript();
+        this._activeView = 'script';
+    }
+
+    showLadderView() {
+        // Salva script antes de sair
+        const ta = document.getElementById('script-editor-ta');
+        if (ta) this.elkScript = ta.value;
+        document.getElementById('script-area').style.display = 'none';
+        document.getElementById('canvas-area').style.display = '';
+        this._activeView = 'ladder';
+    }
+
+    hideScriptPanel() { this.showLadderView(); }
+
+    clearScript() {
+        const ta = document.getElementById('script-editor-ta');
+        if (ta) ta.value = "";
+        this.elkScript = "";
+        this._updateScriptByteCount("");
+    }
+
+    _updateScriptByteCount(text) {
+        const lbl = document.getElementById('script-byte-count');
+        if (!lbl) return;
+        const n = new TextEncoder().encode(text).length;
+        lbl.textContent = `${n} / 4096 bytes`;
+        lbl.style.color = n > 4096 ? '#f87171' : '#94a3b8';
+
+        // Aviso inline: palavras-chave não suportadas por Elk JS
+        const warnLbl = document.getElementById('script-elk-warn');
+        if (warnLbl) {
+            const unsupported = ['while', 'new ', 'class ', 'try ', 'catch ', 'switch '];
+            const found = unsupported.filter(kw => text.includes(kw));
+            if (found.length > 0) {
+                warnLbl.textContent = `⚠ Elk não suporta: ${found.map(s=>s.trim()).join(', ')}  |  const/var → let (auto)`;
+                warnLbl.style.display = 'inline';
+            } else {
+                warnLbl.style.display = 'none';
+            }
+        }
+    }
 }
 
 // Inicializa quando DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new PLCApp();
 });
+

@@ -30,9 +30,30 @@
 
         <!-- Main Content -->
         <div id="main-content">
-            <!-- Canvas Area -->
+            <!-- Canvas Area (view: ladder) -->
             <div id="canvas-area">
                 <canvas id="ladder-canvas"></canvas>
+            </div>
+
+            <!-- Script Area (view: script) — ocupa o mesmo espaço que o canvas -->
+            <div id="script-area" style="display:none; flex:1; flex-direction:column; background:#0f172a; overflow:hidden;">
+                <!-- Barra superior do editor -->
+                <div style="display:flex; align-items:center; padding:6px 12px; background:#1e293b; border-bottom:1px solid #334155; gap:8px; flex-shrink:0;">
+                    <span style="color:#3b82f6; font-weight:bold; font-size:13px;">🔵 Script (Elk JS)</span>
+                    <span style="flex:1"></span>
+                    <span id="script-elk-warn" style="display:none; color:#fbbf24; font-size:11px;"></span>
+                    <span id="script-byte-count" style="color:#94a3b8; font-size:11px;">0 / 4096 bytes</span>
+                    <button id="btn-script-clear" style="background:#0f172a; color:#f1f5f9; border:1px solid #334155; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">🗑 Limpar</button>
+                </div>
+                <!-- Textarea de edição -->
+                <textarea id="script-editor-ta"
+                    spellcheck="false"
+                    placeholder="// Elk JS — escreva on_scan aqui&#10;let t = 0;&#10;&#10;let on_scan = function() {&#10;    let agora = tick_ms();&#10;    if (agora - t >= 500) {&#10;        t = agora;&#10;        plc_output(0, 1 - plc_input(0));&#10;    }&#10;};"
+                    style="flex:1; resize:none; background:#0a0f1a; color:#e2e8f0; font-family:'Consolas','Courier New',monospace; font-size:13px; border:none; padding:12px 16px; outline:none; line-height:1.6; tab-size:4;"></textarea>
+                <!-- Barra de status -->
+                <div style="padding:4px 12px; background:#1e293b; border-top:1px solid #1e293b; color:#475569; font-size:10px; flex-shrink:0;">
+                    plc_input(n) · plc_output(n,v) · plc_analog(n) · plc_pwm(n,duty) · plc_var_get(n) · plc_var_set(n,v) · tick_ms() · delay_ms(ms)
+                </div>
             </div>
 
             <!-- Sidebar: Properties only -->
@@ -189,6 +210,55 @@
         </div>
     </div>
 
+    <!-- Modal: Atualização de Firmware (BLUP) -->
+    <div id="fw-update-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9000;align-items:center;justify-content:center;">
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:28px 32px;min-width:380px;max-width:500px;width:92%;font-family:sans-serif;color:#e2e8f0;display:flex;flex-direction:column;gap:14px;">
+
+            <!-- Título -->
+            <div style="font-size:16px;font-weight:700;color:#60a5fa;">🔄 Atualizar Firmware (BLUP)</div>
+
+            <!-- Status geral -->
+            <div id="fw-status-bar" style="background:#0f172a;border-radius:6px;padding:8px 12px;font-size:13px;color:#94a3b8;min-height:36px;display:flex;align-items:center;gap:8px;">
+                <span id="fw-status-icon">⏳</span>
+                <span id="fw-status-msg">Selecione o arquivo .bin do firmware.</span>
+            </div>
+
+            <!-- Seleção de arquivo -->
+            <div id="fw-drop-zone" style="border:2px dashed #475569;border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s;">
+                <div style="font-size:13px;color:#94a3b8;">Arraste o arquivo <b>.bin</b> aqui ou clique para selecionar</div>
+                <div id="fw-file-name" style="margin-top:6px;font-size:12px;color:#4ade80;word-break:break-all;"></div>
+                <input type="file" id="fw-file-input" accept=".bin" style="display:none;">
+            </div>
+
+            <!-- Barra de progresso -->
+            <div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;">
+                    <span>Progresso BLUP</span>
+                    <span id="fw-progress-text">0%</span>
+                </div>
+                <div style="background:#0f172a;border-radius:6px;height:18px;overflow:hidden;">
+                    <div id="fw-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#2563eb,#60a5fa);transition:width .2s ease;"></div>
+                </div>
+                <div id="fw-bytes-info" style="font-size:11px;color:#475569;margin-top:3px;text-align:right;"></div>
+            </div>
+
+            <!-- Log (textarea = copiável) -->
+            <textarea id="fw-log" readonly style="background:#0f172a;border:none;border-radius:6px;padding:8px 10px;height:130px;overflow-y:auto;font-size:11px;font-family:monospace;line-height:1.5;color:#94a3b8;resize:none;width:100%;box-sizing:border-box;outline:none;"></textarea>
+
+            <!-- Envio manual (debug) -->
+            <div style="display:flex;gap:6px;">
+                <input id="fw-manual-input" type="text" placeholder="Enviar texto ao bootloader..." style="flex:1;padding:6px 8px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:12px;font-family:monospace;">
+                <button id="fw-manual-send" style="padding:6px 14px;background:#334155;color:#e2e8f0;border:none;border-radius:6px;cursor:pointer;font-size:12px;">Enviar</button>
+            </div>
+
+            <!-- Botões -->
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button id="fw-cancel-btn" style="padding:8px 22px;background:#475569;color:#e2e8f0;border:none;border-radius:6px;cursor:pointer;font-size:13px;">Fechar</button>
+                <button id="fw-send-btn" disabled style="padding:8px 22px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;opacity:.4;">▶ Atualizar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Monitor Serial — janela flutuante independente -->
     <div id="monitor-window" class="hidden">
         <div id="monitor-titlebar">
@@ -213,15 +283,17 @@
     <script src="js/mqtt_comm.js?v=9"></script>
     <script src="js/plc_protocol.js?v=8"></script>
     <script src="js/serial_comm.js?v=8"></script>
-    <script src="js/ble_comm.js?v=8"></script>
+    <script src="js/blup.js?v=2"></script>
+    <script src="js/ble_comm.js?v=15"></script>
     <script src="js/plc_serializer.js?v=10"></script>
     <script src="js/themes.js?v=8"></script>
     <script src="js/components.js?v=8"></script>
-    <script src="js/plc_engine.js?v=13"></script>
     <script src="js/canvas.js?v=21"></script>
     <script src="js/properties.js?v=15"></script>
     <script src="js/toolbar.js?v=19"></script>
-    <script src="js/app.js?v=46"></script>
+    <script src="js/app.js?v=54"></script>
     <script src="js/pwa.js?v=15"></script>
 </body>
 </html>
+
+

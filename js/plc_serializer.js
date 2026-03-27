@@ -46,7 +46,7 @@ class PLCSerializer {
      * @param {Array} rungs 
      * @returns {Uint8Array} payload binário
      */
-    serialize(ladderElements, rungs) {
+    serialize(ladderElements, rungs, elkScript) {
         ladderElements = ladderElements || [];
         rungs = rungs || [];
         // 1. Filtering / Prep rungs (Remove duplicates based on Y)
@@ -873,9 +873,53 @@ class PLCSerializer {
         // Rung state seen
         for(let i=0; i<numRungs; i++) payload.push(0x00);
 
+        // Bloco LU (Elk JS script) — magic 0x4C 0x55 + len (2 LE) + bytes UTF-8
+        // Equivalente ao LUA_BLOCK_MAGIC do firmware (plc.h)
+        if (elkScript && elkScript.trim()) {
+            // Aplica mesmas transformações do Python (plc_serializer.py):
+            // Elk JS NÃO suporta: const, var, while, new, class, try/catch
+            // Converte para sintaxe compatível com Elk JS
+            let src = elkScript.trim();
+
+            // 1. "function name(" → "let name = function("
+            let buf = '';
+            let i = 0;
+            while (i < src.length) {
+                if (src.slice(i, i + 9) === 'function ' && i + 9 < src.length) {
+                    let j = i + 9;
+                    while (j < src.length && (src[j] === ' ' || src[j] === '\t')) j++;
+                    let k = j;
+                    while (k < src.length && /[\w$]/.test(src[k])) k++;
+                    if (k > j) {
+                        const name = src.slice(j, k);
+                        buf += 'let ' + name + ' = function';
+                        i = k;
+                        continue;
+                    }
+                }
+                buf += src[i];
+                i++;
+            }
+            src = buf;
+
+            // 2. "const " → "let "  e  "var " → "let "
+            src = src.replace(/\bconst\s+/g, 'let ').replace(/\bvar\s+/g, 'let ');
+
+            const scriptBytes = new TextEncoder().encode(src);
+            let scriptLen = scriptBytes.length;
+            if (scriptLen > 4096) scriptLen = 4096;
+            if (scriptLen > 0) {
+                payload.push(0x4C);              // 'L'
+                payload.push(0x55);              // 'U'
+                payload.push(scriptLen & 0xFF);  // len low
+                payload.push((scriptLen >> 8) & 0xFF); // len high
+                for (let bi = 0; bi < scriptLen; bi++) payload.push(scriptBytes[bi]);
+            }
+        }
+
         // ATENCAO: O CRC (Checksum XOR) é calculado globalmente no PLCProtocol.js `createLoadProgramPacket`
         // O algoritmo Python original inseria o CRC fora do serialize.
-        
+
         return new Uint8Array(payload);
     }
 }

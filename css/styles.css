@@ -488,6 +488,18 @@ body {
     overflow: hidden;
 }
 
+/* Script area — ocupa o mesmo flex:1 que canvas-area (estilo QStackedWidget Python) */
+#script-area {
+    flex: 1;
+    overflow: hidden;
+}
+
+#script-editor-ta {
+    flex: 1;
+    width: 100%;
+    box-sizing: border-box;
+}
+
 #ladder-canvas {
     display: block;
     width: 100%;

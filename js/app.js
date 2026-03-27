@@ -627,7 +627,7 @@ class PLCApp {
 
     async sendCommCommand(packetData, label) {
         if (!this.activeComm) {
-            alert("Conecte-se ao PLC (Serial ou BLE) primeiro!");
+            alert("Conecte-se ao PLC (Serial, BLE ou Web) primeiro!");
             return;
         }
 
@@ -649,7 +649,7 @@ class PLCApp {
 
     async uploadToPLC() {
         if (!this.activeComm) {
-            alert("Conecte-se ao PLC (Serial ou BLE) primeiro!");
+            alert("Conecte-se ao PLC (Serial, BLE ou Web) primeiro!");
             return;
         }
         if (!this.serializer || !this.plcProtocol) {
@@ -711,7 +711,7 @@ class PLCApp {
         }
 
         if (!this.activeComm) {
-            alert("Conecte ao PLC primeiro (Serial ou BLE).");
+            alert("Conecte ao PLC primeiro (Serial, BLE ou Web).");
             return;
         }
 
@@ -846,7 +846,7 @@ class PLCApp {
     // ===== Enviar BIN para PLC (carrega arquivo + verifica senha + envia) =====
     async sendBinToPlc() {
         if (!this.activeComm) {
-            alert("Conecte-se ao PLC (Serial ou BLE) primeiro!");
+            alert("Conecte-se ao PLC (Serial, BLE ou Web) primeiro!");
             return;
         }
 

@@ -3,7 +3,7 @@
  * Estratégia: Cache-First com fallback para rede
  */
 
-const CACHE_NAME = 'plc-editor-v60';
+const CACHE_NAME = 'plc-editor-v72';
 
 const ASSETS_TO_CACHE = [
     './',
@@ -20,6 +20,7 @@ const ASSETS_TO_CACHE = [
     './js/components.js',
     './js/canvas.js',
     './js/properties.js',
+    './js/conectores.js',
     './js/toolbar.js',
     './js/app.js',
     './js/pwa.js',

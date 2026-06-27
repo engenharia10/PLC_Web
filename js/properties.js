@@ -509,6 +509,76 @@ class PropertiesPanel {
             }));
         }
 
+        // =========================================================
+        // IHM — bind para widgets da IHM ESP32-S3 (CAN/Serial/485)
+        // =========================================================
+        if (type === 'ihm') {
+            // Bind ID (1..65535) — vai no payload binário CAN/Serial
+            frag.appendChild(this._createField('Bind ID (1..65535):', 'number', el.ihm_bind_id || '1', (v) => {
+                el.ihm_bind_id = v;
+            }));
+
+            // Direção do fluxo PLC↔IHM
+            frag.appendChild(this._createRadioGroup('Direção:', [
+                { value: 'SEND',    label: 'PLC→IHM' },
+                { value: 'RECEIVE', label: 'IHM→PLC' },
+                { value: 'BOTH',    label: 'Ambos' },
+            ], el.ihm_direction || 'RECEIVE', (v) => {
+                el.ihm_direction = v;
+                this.app.updateProperties();
+            }));
+
+            // Canal unificado (Serial / CAN1 / CAN2 / 485) → mapeia transport+can_bus
+            const currentChannel = (() => {
+                const t = el.ihm_transport || 'CAN';
+                if (t === 'Serial') return 'Serial';
+                if (t === 'RS485')  return 'RS485';
+                return el.ihm_can_bus || 'CAN1';   // transport CAN → CAN1/CAN2
+            })();
+            frag.appendChild(this._createRadioGroup('Canal:', [
+                { value: 'Serial', label: 'Serial' },
+                { value: 'CAN1',   label: 'CAN1' },
+                { value: 'CAN2',   label: 'CAN2' },
+                { value: 'RS485',  label: '485' },
+            ], currentChannel, (v) => {
+                if (v === 'Serial')      { el.ihm_transport = 'Serial'; }
+                else if (v === 'RS485')  { el.ihm_transport = 'RS485'; }
+                else { el.ihm_transport = 'CAN'; el.ihm_can_bus = v; }
+                this.app.updateProperties();
+            }));
+
+            const ihmChannel = currentChannel;
+
+            // Baudrate de Serial/485 agora é GLOBAL (página Conectores → Periféricos
+            // Ativos), não mais por componente. Aqui só configuramos o CAN.
+            if (ihmChannel === 'Serial' || ihmChannel === 'RS485') {
+                frag.appendChild(this._createInfo('Baudrate Serial/485: configurado em Conectores → Periféricos Ativos.'));
+            } else {
+                // Endereço CAN — TX em SEND, filtro em RECEIVE
+                frag.appendChild(this._createField('Endereço CAN (Hex):', 'text', el.ihm_can_address || '0x00000001', (v) => {
+                    el.ihm_can_address = v;
+                }));
+            }
+
+            // Intervalo de atualização
+            frag.appendChild(this._createField('Intervalo (ms):', 'number', el.ihm_period_ms || '100', (v) => {
+                el.ihm_period_ms = v;
+            }));
+
+            // Fonte externa — só usada em SEND/BOTH (em RECEIVE a topologia define a fonte)
+            const ihmDir = el.ihm_direction || 'RECEIVE';
+            if (ihmDir === 'SEND' || ihmDir === 'BOTH') {
+                frag.appendChild(this._createSelect('Fonte:', [
+                    'VAR','POT','JOY','Q','I','TON','TOF','CTU','CTD','CMP','MATH','AN','RTC'
+                ].map(s => ({ value: s, label: s })), el.ihm_source_type || 'Q', (v) => {
+                    el.ihm_source_type = v;
+                }));
+                frag.appendChild(this._createField('Componente vinculado:', 'text', el.ihm_source_name || '', (v) => {
+                    el.ihm_source_name = v;
+                }));
+            }
+        }
+
         // === BOTÃO DELETAR ===
         const delBtn = document.createElement('button');
         delBtn.className = 'props-delete-btn';
@@ -530,6 +600,16 @@ class PropertiesPanel {
     // =========================================================
     // Helpers de criação de widgets
     // =========================================================
+
+    _createInfo(text) {
+        const group = document.createElement('div');
+        group.className = 'props-group';
+        const info = document.createElement('div');
+        info.style.cssText = 'font-size:11px;color:#94a3b8;font-style:italic;line-height:1.4;';
+        info.textContent = text;
+        group.appendChild(info);
+        return group;
+    }
 
     _createField(label, type, value, onChange) {
         const group = document.createElement('div');

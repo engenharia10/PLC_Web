@@ -189,15 +189,26 @@ body {
 }
 
 .toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    box-sizing: border-box;
     background: rgba(255,255,255,0.08);
     border: 1px solid rgba(255,255,255,0.18);
     color: white;
-    font-size: 28px;
+    font-size: 26px;
     padding: 3px;
     border-radius: 6px;
     cursor: pointer;
     transition: background 0.15s, transform 0.1s, border-color 0.15s, box-shadow 0.15s;
     line-height: 1;
+}
+.toolbar-btn svg {
+    display: block;
+    width: 30px;
+    height: 30px;
 }
 .toolbar-btn:hover {
     background: rgba(255,255,255,0.20);
@@ -943,3 +954,45 @@ body {
     }
 }
 
+
+/* ===================== Página Conectores ===================== */
+#conectores-area { color: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+.conn-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 14px; background: #1e293b; border-bottom: 1px solid #334155; flex-shrink: 0;
+}
+.conn-back-btn {
+    background: #2563eb; color: #fff; border: none; border-radius: 4px;
+    padding: 6px 14px; font-size: 13px; font-weight: bold; cursor: pointer;
+}
+.conn-back-btn:hover { background: #1d4ed8; }
+.conn-title { flex: 1; text-align: center; font-size: 16px; font-weight: bold; color: #e2e8f0; }
+.conn-scroll { flex: 1; overflow-y: auto; padding: 18px; }
+.conn-box {
+    background: #1e293b; border: 3px solid #475569; border-radius: 6px;
+    padding: 16px 18px; margin: 0 auto 18px; max-width: 1200px;
+}
+.conn-box-title { font-size: 14px; font-weight: bold; color: #fff; margin-bottom: 12px; }
+.conn-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; flex-wrap: wrap; }
+.conn-check { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; min-width: 150px; }
+.conn-check input { width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer; }
+.conn-lbl { font-size: 13px; color: #cbd5e1; }
+.conn-input, .conn-select {
+    background: #334155; color: #e2e8f0; border: 1px solid #475569; border-radius: 4px;
+    padding: 4px 8px; font-size: 13px; width: 80px;
+}
+.conn-input:focus, .conn-select:focus { outline: none; border-color: #2563eb; }
+.conn-grid { display: flex; flex-direction: column; gap: 5px; }
+.conn-grid-row { display: flex; gap: 3px; }
+.conn-pin {
+    flex: 1 1 0; min-width: 0; height: 54px; border: 2px solid; border-radius: 4px;
+    padding: 3px 4px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;
+    overflow: hidden;
+}
+.conn-pin-head { display: flex; justify-content: space-between; align-items: baseline; gap: 2px; }
+.conn-pin-num { font-size: 9px; font-weight: bold; white-space: nowrap; }
+.conn-pin-log { font-size: 9px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conn-pin-fn { font-size: 9px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conn-legend { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; padding: 6px 0 20px; }
+.conn-leg { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #cbd5e1; }
+.conn-leg i { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #475569; display: inline-block; }

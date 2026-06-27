@@ -189,7 +189,8 @@ class Toolbar {
             { icon: '📂', tooltip: 'Abrir (Ctrl+O)', action: () => this.app.openProject() },
             { icon: '💾', tooltip: 'Salvar (Ctrl+S)', action: () => this.app.saveProject() },
             { type: 'separator' },
-            { icon: '⚙️', tooltip: 'Conectores', action: () => {} },
+            { svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M10.5 5.5a2 2 0 0 1 0 4" stroke="#9C27B0" stroke-width="1.3" stroke-linecap="round"/><path d="M13.5 4.5a3.2 3.2 0 0 1 0 6" stroke="#9C27B0" stroke-width="1.3" stroke-linecap="round"/><rect x="2.5" y="9" width="6.5" height="12" rx="1.3" fill="#9C27B0" stroke="#7B1FA2" stroke-width="1"/><rect x="9" y="11" width="2.5" height="1.4" rx="0.5" fill="#BDBDBD"/><rect x="9" y="14.3" width="2.5" height="1.4" rx="0.5" fill="#BDBDBD"/><rect x="9" y="17.6" width="2.5" height="1.4" rx="0.5" fill="#BDBDBD"/><rect x="15" y="9" width="6.5" height="12" rx="1.3" fill="#9C27B0" stroke="#7B1FA2" stroke-width="1"/><rect x="15.4" y="11" width="2.6" height="1.4" rx="0.5" fill="#fff"/><rect x="15.4" y="14.3" width="2.6" height="1.4" rx="0.5" fill="#fff"/><rect x="15.4" y="17.6" width="2.6" height="1.4" rx="0.5" fill="#fff"/></svg>`,
+              tooltip: 'Conectores', action: () => this.app.showConectoresView() },
             { type: 'spacer' },
             { icon: '🔌', tooltip: 'Conectar ao PLC', action: () => this.app.showCommModal() },
             { icon: '⬆️', tooltip: 'Transferir para PLC', action: () => this.app.uploadToPLC() },
@@ -210,7 +211,8 @@ class Toolbar {
             } else {
                 const b = document.createElement('button');
                 b.className = 'toolbar-btn';
-                b.textContent = btn.icon;
+                if (btn.svg) b.innerHTML = btn.svg;
+                else b.textContent = btn.icon;
                 b.title = btn.tooltip;
                 if (btn.id) b.id = btn.id;
                 b.onclick = btn.action;

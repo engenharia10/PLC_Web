@@ -12,6 +12,7 @@ class PLCApp {
         this.elkScript = "";
         this._bleBlocked = false;  // true somente após STOP explícito; limpa no START ou reconexão BLE
         this.plcType = 'PLC-Max.';
+        this.ioConfig = {};  // config de periféricos (CAN1/2, PWM) da página Conectores
 
         // Theme
         this.theme = new ThemeManager('dark');
@@ -28,6 +29,9 @@ class PLCApp {
         const propsContainer = document.getElementById('props-content');
         this.propertiesPanel = new PropertiesPanel(propsContainer, this);
         this.updateProperties();
+
+        // Página Conectores
+        this.conectoresPage = typeof ConectoresPage !== 'undefined' ? new ConectoresPage(this) : null;
 
         // Drop zone
         this._setupCanvasDrop();
@@ -266,6 +270,7 @@ class PLCApp {
             "Data:": dateStr,
             plc_type: this.plcType,
             lua_script: this.elkScript || "",
+            io_config: this.ioConfig || {},
             routines: [{
                 rungs: this.rungs.map(r => {
                     // Branches desta rung
@@ -316,6 +321,9 @@ class PLCApp {
 
         // Carrega plc_type se presente
         if (data.plc_type) this.plcType = data.plc_type;
+
+        // Carrega config de periféricos (Conectores) se presente
+        this.ioConfig = (data.io_config && typeof data.io_config === 'object') ? data.io_config : {};
 
         // Carrega script Elk JS se presente
         this.elkScript = data.lua_script || "";
@@ -660,7 +668,7 @@ class PLCApp {
         try {
             this.logComm(`> Preparando UPLOAD: Serializando Ladder...`);
             this.logComm(`> [DEBUG] Elements: ${this.elements.length} | Rungs: ${this.rungs.length}`);
-            let payloadData = this.serializer.serialize(this.elements, this.rungs, this.elkScript);
+            let payloadData = this.serializer.serialize(this.elements, this.rungs, this.elkScript, this.ioConfig);
 
             let packet = PLCProtocol.createLoadProgramPacket(payloadData);
             this.logComm(`> Pacote montado: ${packet.length} bytes.`);
@@ -819,7 +827,7 @@ class PLCApp {
     async saveBin() {
         if (!this.serializer) { alert("Módulo de serialização não carregado."); return; }
         try {
-            const payloadData = this.serializer.serialize(this.elements, this.rungs, this.elkScript);
+            const payloadData = this.serializer.serialize(this.elements, this.rungs, this.elkScript, this.ioConfig);
             let packet = PLCProtocol.createLoadProgramPacket(payloadData);
 
             if (await this._confirmSimNao("Deseja proteger o arquivo .bin com senha?")) {
@@ -1455,6 +1463,8 @@ class PLCApp {
     // ===== Troca de view: ladder ↔ script (estilo QStackedWidget do Python) =====
     showScriptPanel() {
         document.getElementById('canvas-area').style.display = 'none';
+        const ca = document.getElementById('conectores-area');
+        if (ca) ca.style.display = 'none';
         const sa = document.getElementById('script-area');
         sa.style.display = 'flex';
         const ta = document.getElementById('script-editor-ta');
@@ -1472,11 +1482,21 @@ class PLCApp {
         this._activeView = 'script';
     }
 
+    showConectoresView() {
+        if (!this.conectoresPage) return;
+        // Salva script antes de sair, se estiver no editor
+        const ta = document.getElementById('script-editor-ta');
+        if (ta && this._activeView === 'script') this.elkScript = ta.value;
+        this.conectoresPage.show();
+    }
+
     showLadderView() {
         // Salva script antes de sair
         const ta = document.getElementById('script-editor-ta');
         if (ta) this.elkScript = ta.value;
         document.getElementById('script-area').style.display = 'none';
+        const ca = document.getElementById('conectores-area');
+        if (ca) ca.style.display = 'none';
         document.getElementById('canvas-area').style.display = '';
         this._activeView = 'ladder';
     }

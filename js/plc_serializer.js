@@ -5,6 +5,122 @@
  * Equivalente ao plc_serializer.py e plc_generator_binary.py
  */
 
+/**
+ * RPN parser — porta de rpn_parser.py.
+ * Converte expressão infix ("(V0 + JOY0) * C0 / 100") em tokens RPN e serializa
+ * para o formato binário do firmware (3 bytes por token: [tipo][val_lo][val_hi]).
+ */
+const RPNParser = {
+    PRECEDENCE: { '+': 1, '-': 1, '*': 2, '/': 2, '%': 2, '^': 3 },
+    LEFT_ASSOC: new Set(['+', '-', '*', '/', '%']),
+
+    tokenize(expression) {
+        const expr = String(expression || '').trim();
+        // Decimal vem ANTES do inteiro (match guloso). Igual ao regex do Python.
+        const re = /(-?\d+\.\d+|-?\d+|VAR\d+|V\d+|C\d+|T\d+|M\d+|JOY\d+|POT\d+|[A-Za-z_][A-Za-z0-9_]*|[+\-*/%^()])/g;
+        const tokens = [];
+        let m;
+        while ((m = re.exec(expr)) !== null) tokens.push(m[1]);
+        return tokens;
+    },
+
+    _isOperand(token) {
+        if (/^-?\d+\.\d+$/.test(token)) return true;
+        if (/^-?\d+$/.test(token)) return true;
+        if (/^(VAR|V|C|T|M|JOY|POT)\d+$/.test(token)) return true;
+        if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token)) return true;
+        return false;
+    },
+
+    infixToRpn(expression) {
+        const tokens = this.tokenize(expression);
+        const out = [];
+        const ops = [];
+        for (const token of tokens) {
+            if (this._isOperand(token)) {
+                out.push(token);
+            } else if (token in this.PRECEDENCE) {
+                while (ops.length && ops[ops.length - 1] !== '(' &&
+                       (ops[ops.length - 1] in this.PRECEDENCE) &&
+                       (this.PRECEDENCE[ops[ops.length - 1]] > this.PRECEDENCE[token] ||
+                        (this.PRECEDENCE[ops[ops.length - 1]] === this.PRECEDENCE[token] &&
+                         this.LEFT_ASSOC.has(token)))) {
+                    out.push(ops.pop());
+                }
+                ops.push(token);
+            } else if (token === '(') {
+                ops.push(token);
+            } else if (token === ')') {
+                while (ops.length && ops[ops.length - 1] !== '(') out.push(ops.pop());
+                if (ops.length && ops[ops.length - 1] === '(') ops.pop();
+            }
+        }
+        while (ops.length) out.push(ops.pop());
+        return out;
+    },
+
+    // Expande literais float ("13.1234") em RPN inteiro equivalente (mantém int16).
+    _expandFloatConstants(rpnTokens) {
+        const expanded = [];
+        for (const tok of rpnTokens) {
+            if (typeof tok === 'string' && /^-?\d+\.\d+$/.test(tok)) {
+                const negative = tok.startsWith('-');
+                const body = tok.replace(/^-+/, '');
+                const parts = body.split('.');
+                const ipStr = parts[0];
+                let fracStr = (parts[1] || '').slice(0, 4); // máx 4 casas (int16)
+                const scale = Math.pow(10, fracStr.length);
+                const ip = parseInt(ipStr, 10) || 0;
+                const frac = fracStr ? (parseInt(fracStr, 10) || 0) : 0;
+                if (negative) {
+                    expanded.push(String(-ip), String(frac), String(scale), '/', '-');
+                } else {
+                    expanded.push(String(ip), String(frac), String(scale), '/', '+');
+                }
+            } else {
+                expanded.push(tok);
+            }
+        }
+        return expanded;
+    },
+
+    encodeToken(token) {
+        switch (token) {
+            case '+': return [0xF0, 0];
+            case '-': return [0xF1, 0];
+            case '*': return [0xF2, 0];
+            case '/': return [0xF3, 0];
+            case '%': return [0xF4, 0];
+            case '^': return [0xF5, 0];
+        }
+        if (/^-?\d+$/.test(token)) {
+            let value = parseInt(token, 10);
+            value = Math.max(-32768, Math.min(32767, value));
+            return [0x00, value];
+        }
+        let mt;
+        if ((mt = /^VAR(\d+)$/.exec(token))) return [0x04, parseInt(mt[1], 10)];
+        if ((mt = /^V(\d+)$/.exec(token)))   return [0x04, parseInt(mt[1], 10)];
+        if ((mt = /^C(\d+)$/.exec(token)))   return [0x01, parseInt(mt[1], 10)];
+        if ((mt = /^T(\d+)$/.exec(token)))   return [0x02, parseInt(mt[1], 10)];
+        if ((mt = /^M(\d+)$/.exec(token)))   return [0x03, parseInt(mt[1], 10)];
+        if ((mt = /^JOY(\d+)$/.exec(token))) return [0x0D, parseInt(mt[1], 10)];
+        if ((mt = /^POT(\d+)$/.exec(token))) return [0x0C, parseInt(mt[1], 10)];
+        throw new Error(`Token inválido na fórmula RPN: '${token}'`);
+    },
+
+    serializeRpn(rpnTokens) {
+        const tokens = this._expandFloatConstants(rpnTokens);
+        const out = [];
+        for (const token of tokens) {
+            let [type, value] = this.encodeToken(token);
+            if (value < 0) value = (1 << 16) + value; // complemento de 2
+            out.push(type & 0xFF, value & 0xFF, (value >> 8) & 0xFF);
+        }
+        return out;
+    },
+};
+
 class PLCSerializer {
     constructor() {
         // Limites físicos no ECU-MAX:
@@ -41,12 +157,50 @@ class PLCSerializer {
     }
 
     /**
+     * Normaliza variáveis textuais de fórmula para sintaxe Vn (porta de
+     * normalize_formula_variables do plc_generator_binary.py):
+     *  - VAR123 → V123
+     *  - Nome de variável do ladder (ex: PRESSAO) → V<indice>
+     */
+    _normalizeFormulaVariables(formula, allElements) {
+        if (!formula) return '';
+        let normalized = String(formula);
+        // VAR123 → V123
+        normalized = normalized.replace(/\bVAR(\d+)\b/gi, 'V$1');
+
+        if (!allElements || !allElements.length) return normalized;
+        const variables = allElements.filter(e => e.type === 'variable');
+        if (!variables.length) return normalized;
+
+        const nameToV = {};
+        variables.forEach((v, varIdx) => {
+            const varName = String(v.name || '').trim();
+            if (!varName) return;
+            const up = varName.toUpperCase();
+            let resolvedIdx;
+            if (up.startsWith('VAR') && /^\d+$/.test(up.slice(3))) resolvedIdx = parseInt(up.slice(3), 10);
+            else if (up.startsWith('V') && /^\d+$/.test(up.slice(1))) resolvedIdx = parseInt(up.slice(1), 10);
+            else resolvedIdx = varIdx;
+            nameToV[varName] = `V${resolvedIdx}`;
+        });
+
+        // Substitui nomes maiores primeiro (evita colisão parcial)
+        const names = Object.keys(nameToV).sort((a, b) => b.length - a.length);
+        for (const name of names) {
+            const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(`(?<![A-Za-z0-9_])${esc}(?![A-Za-z0-9_])`, 'gi');
+            normalized = normalized.replace(re, nameToV[name]);
+        }
+        return normalized;
+    }
+
+    /**
      * Ponto de entrada principal para serialização
      * @param {Array} ladderElements 
      * @param {Array} rungs 
      * @returns {Uint8Array} payload binário
      */
-    serialize(ladderElements, rungs, elkScript) {
+    serialize(ladderElements, rungs, elkScript, ioConfig) {
         ladderElements = ladderElements || [];
         rungs = rungs || [];
         // 1. Filtering / Prep rungs (Remove duplicates based on Y)
@@ -132,13 +286,31 @@ class PLCSerializer {
         payload.push(pots.length & 0xFF);             // [10]
         payload.push(joysticks.length & 0xFF);        // [11]
 
-        // Periféricos
-        let pwmEnabled = coilsPWM.length > 0 ? 1 : 0;
-        let pwmFreq = 100; // Padrão
+        // Periféricos — auto-derivado dos elementos; io_config (página Conectores)
+        // sobrescreve quando presente (mesma prioridade do plc_serializer.py).
+        const cfg = ioConfig || {};
+        let pwmEnabled = coilsPWM.length > 0 ? 1 : 0; // auto (não sobrescrito por io_config)
+        let pwmFreq = 100;
         let can1Enabled = cans.length > 0 ? 1 : 0;
         let can1Baud = 250;
         let can2Enabled = cans.some(c => c.can_bus === 'CAN2') ? 1 : 0;
         let can2Baud = 250;
+
+        if ('PWM_frequency' in cfg) pwmFreq = parseInt(cfg.PWM_frequency, 10) || 100;
+        if ('CAN1_enabled' in cfg) can1Enabled = cfg.CAN1_enabled ? 1 : 0;
+        if ('CAN1_baudrate' in cfg) can1Baud = parseInt(cfg.CAN1_baudrate, 10) || 250;
+        if ('CAN2_enabled' in cfg) can2Enabled = cfg.CAN2_enabled ? 1 : 0;
+        if ('CAN2_baudrate' in cfg) can2Baud = parseInt(cfg.CAN2_baudrate, 10) || 250;
+
+        // IHM com transporte CAN também força habilitar o barramento (igual ao Python)
+        for (const e of ladderElements) {
+            if (e.type !== 'ihm') continue;
+            const t = String(e.ihm_transport || '').trim();
+            if (t === 'CAN' || t === 'Both') {
+                if ((e.ihm_can_bus || 'CAN1') === 'CAN1') can1Enabled = 1;
+                else if (e.ihm_can_bus === 'CAN2') can2Enabled = 1;
+            }
+        }
 
         payload.push(pwmEnabled);                      // [12]
         payload.push(pwmFreq & 0xFF);                  // [13]
@@ -530,13 +702,34 @@ class PLCSerializer {
             let opByte = mathOpMap[opStr] || 0x00;
             let rungIndex = this._getElementRungIndex(math, rungs);
             
-            // Formula support - basic fallback
+            // FORMULA → RPN (porta de plc_generator_binary.serialize_math_elements):
+            // [0]=0x09 [1]=index [2]=0x80 [3]=num_tokens [4]=rung_index [5..]=tokens(3B)
             if (opStr === 'FORMULA') {
-                // Not fully porting RPN in JS on step 1, skipping or sending basic struct
+                let formula = '';
+                for (const key of ['math_custom_formula', 'formula', 'math_auto_formula',
+                                   'custom_formula', 'auto_formula', 'math_formula']) {
+                    const v = math[key] != null ? String(math[key]).trim() : '';
+                    if (v) { formula = v; break; }
+                }
+                formula = this._normalizeFormulaVariables(formula, ladderElements);
+                if (!formula) {
+                    console.warn(`MATH ${i} operation=FORMULA mas fórmula vazia — ignorado`);
+                    continue;
+                }
+                let rpnTokens, rpnBytes;
+                try {
+                    rpnTokens = RPNParser.infixToRpn(formula);
+                    rpnBytes = RPNParser.serializeRpn(rpnTokens);
+                } catch (e) {
+                    console.warn(`MATH ${i} fórmula inválida ('${formula}'): ${e.message} — ignorado`);
+                    continue;
+                }
                 payload.push(0x09);
                 payload.push(i & 0xFF);
-                payload.push(0x80);
-                payload.push(0); // 0 tokens for now
+                payload.push(0x80);                    // RPN marker
+                payload.push(rpnTokens.length & 0xFF); // num_tokens
+                payload.push(rungIndex & 0xFF);        // rung_index (byte [4])
+                for (const b of rpnBytes) payload.push(b & 0xFF);
                 continue;
             }
 
@@ -621,7 +814,7 @@ class PLCSerializer {
             payload.push(rungIndex & 0xFF);
         }
         
-        // Serializa JOYS (9 bytes)
+        // Serializa JOYS (11 bytes: [9-10]=min estável p/ calibração)
         for (let i = 0; i < joysticks.length; i++) {
             let joy = joysticks[i];
             let analogPin = joy.analog_pin || 'I0.5';
@@ -642,10 +835,12 @@ class PLCSerializer {
             payload.push(rungIndex & 0xFF);
             payload.push(axisByte);
             payload.push(pinNumber & 0xFF);
-            payload.push(minVal & 0xFF);
-            payload.push((minVal >> 8) & 0xFF);
-            payload.push(maxVal & 0xFF);
-            payload.push((maxVal >> 8) & 0xFF);
+            payload.push(minVal & 0xFF);          // [5] (runtime: sobrescrito p/ valor mapeado)
+            payload.push((minVal >> 8) & 0xFF);   // [6]
+            payload.push(maxVal & 0xFF);          // [7] max
+            payload.push((maxVal >> 8) & 0xFF);   // [8]
+            payload.push(minVal & 0xFF);          // [9] min (cópia ESTÁVEL)
+            payload.push((minVal >> 8) & 0xFF);   // [10]
         }
 
         // Serializa VARIABLEs
@@ -705,8 +900,9 @@ class PLCSerializer {
             }
         }
 
-        // Serializa CAN (20 bytes por elemento)
+        // Serializa CAN (36 bytes por elemento: 20 config + 16 estado runtime)
         // [0]=0x0F [1]=idx [2]=rung [3]=mode_byte [4-7]=ID(LE) [8]=dlc [9-10]=time(LE) [11]=rx_mask|tx_var_mask [12-19]=tx_data
+        // [20-35]=estado runtime (timing TX + RX) — zerado; mantido no .bin pelo STM32
         for (let canIdx = 0; canIdx < cans.length; canIdx++) {
             let can = cans[canIdx];
             let canMode = can.can_mode || 'SEND';
@@ -777,9 +973,11 @@ class PLCSerializer {
             payload.push((canTime >> 8) & 0xFF);                         // [10] time hi
             payload.push(modeBit === 0 ? (txVarMask & 0xFF) : (rxBitmask & 0xFF)); // [11]
             for (let i = 0; i < 8; i++) payload.push(txBytes[i] & 0xFF); // [12-19] tx_data
+            for (let k = 0; k < 16; k++) payload.push(0x00);             // [20-35] estado runtime
         }
 
-        // Serializa bobinas PWM (13 bytes cada)
+        // Serializa bobinas PWM (20 bytes cada — PWM_COIL_BLOCK_SIZE)
+        // [0-11]=config + [12-19]=estado runtime da rampa (zerado; mantido no .bin)
         for (let coil of coilsPWM) {
             let name = coil.name || 'Q0';
             let index = 0;
@@ -799,7 +997,7 @@ class PLCSerializer {
             payload.push(currentFinal & 0xFF); payload.push((currentFinal >> 8) & 0xFF);
             payload.push(rampInit & 0xFF);     payload.push((rampInit >> 8) & 0xFF);
             payload.push(rampFinal & 0xFF);    payload.push((rampFinal >> 8) & 0xFF);
-            payload.push(0x00); // reserved
+            for (let k = 0; k < 8; k++) payload.push(0x00); // [12-19] estado runtime rampa
         }
 
         // Serializa entradas analógicas (6 bytes cada)
@@ -816,7 +1014,10 @@ class PLCSerializer {
             payload.push(0x00); // adc_channel placeholder
         }
 
-        // Serializa contatos de pulso (8 bytes cada)
+        // Serializa contatos de pulso (16 bytes cada — PULSE_BLOCK_SIZE)
+        // [0]=0x11 [1]=index [2-3]=valor(runtime) [4]=pin [5]=ppr [6]=filtro [7]=mode
+        // [8-11]=accum_count(runtime) [12-15]=accum_start(runtime) — estado da
+        // janela RPM mantido no próprio .bin pelo STM32 (sem arrays locais).
         for (let pulse of contactsPulse) {
             let name = pulse.name || 'I0';
             let index = 0;
@@ -833,6 +1034,7 @@ class PLCSerializer {
             payload.push(ppr & 0xFF);
             payload.push(filterMs & 0xFF);
             payload.push(mode & 0xFF);
+            for (let k = 0; k < 8; k++) payload.push(0x00); // [8-15] estado runtime (accum)
         }
 
         // ========================================================
@@ -849,10 +1051,10 @@ class PLCSerializer {
         // Numero de rungs efetivo para seções
         payload.push(numRungs & 0xFF);
         
-        // 29 bytes de Inputs O0-O28
-        for(let i=0; i<29; i++) payload.push(0x00);
-        
-        // 31 bytes Outputs Q0-Q30
+        // 30 bytes FIXOS de Input image I0.0-I0.29 (igual ao Python; inclui PF3/pino 23)
+        for(let i=0; i<30; i++) payload.push(0x00);
+
+        // 31 bytes FIXOS Output image Q0.0-Q3.6
         for(let i=0; i<31; i++) payload.push(0x00);
         
         // Contact results
@@ -872,6 +1074,230 @@ class PLCSerializer {
         
         // Rung state seen
         for(let i=0; i<numRungs; i++) payload.push(0x00);
+
+        // ========================================================
+        // BLOCO IHM (opcional) — binds para widgets da IHM ESP32-S3
+        // Formato v4: [0x49 'I'][0x48 'H'][0x04 ver][num_ihm]
+        //             [serBaud/100 LE u16][rs485Baud/100 LE u16][bloco × num]
+        // Cada bloco IHM = 25 bytes (16 config + 9 estado runtime no .bin).
+        // Porta de plc_serializer.py — inclui detecção de topologia por vizinhos.
+        // ========================================================
+        {
+            let ihms = ladderElements.filter(e => e.type === 'ihm');
+            if (ihms.length > 255) ihms = ihms.slice(0, 255);
+            if (ihms.length > 0) {
+                const IHM_SOURCE_TYPE = {
+                    VAR: 0x04, POT: 0x0C, JOY: 0x0D, Q: 0x0A, I: 0x0B,
+                    TON: 0x02, TOF: 0x02, CTU: 0x01, CTD: 0x01,
+                    CMP: 0x07, MATH: 0x03, AN: 0x10, RTC: 0x05, CONST: 0x00,
+                };
+                const IHM_DIRECTION = { SEND: 0, RECEIVE: 1, BOTH: 2 };
+
+                const sourceIndexFromName = (name) => {
+                    const n = String(name || '').trim();
+                    if (!n) return 0;
+                    if (n.includes('.')) {
+                        const p = parseInt(n.split('.')[1], 10);
+                        return isNaN(p) ? 0 : (p & 0xFF);
+                    }
+                    let digits = '';
+                    for (let k = n.length - 1; k >= 0; k--) {
+                        if (/\d/.test(n[k])) digits = n[k] + digits;
+                        else break;
+                    }
+                    return digits ? (parseInt(digits, 10) & 0xFF) : 0;
+                };
+
+                const transportMask = (transport, canBus) => {
+                    const t = String(transport || 'Serial').trim();
+                    const bus = String(canBus || 'CAN1').trim();
+                    let mask = 0;
+                    if (t === 'Serial') mask = 0b0001;
+                    else if (t === 'CAN') mask = (bus === 'CAN1') ? 0b0010 : 0b0100;
+                    else if (t === 'Both') mask = 0b0001 | ((bus === 'CAN1') ? 0b0010 : 0b0100);
+                    else if (t === 'RS485') mask = 0b1000;
+                    return mask & 0xFF;
+                };
+
+                const baudDiv100 = (v) => {
+                    let b = parseInt(String(v).trim(), 10);
+                    if (isNaN(b)) b = 115200;
+                    return Math.max(0, Math.min(Math.floor(b / 100), 65535));
+                };
+
+                const parseCanId = (s) => {
+                    const str = String(s || '0x00000001').trim();
+                    let v = str.toLowerCase().startsWith('0x') ? parseInt(str, 16) : parseInt(str, 10);
+                    if (!isFinite(v) || isNaN(v)) v = 1;
+                    return v >>> 0;
+                };
+
+                // Topologia ladder: vizinho à ESQUERDA → SEND; à DIREITA → RECEIVE
+                // (prioriza direita). Fallback: config do usuário se não houver vizinho.
+                const validPartnerTypes = new Set([
+                    'coil', 'contact', 'variable', 'potentiometer', 'joystick',
+                    'analog_input', 'timer', 'counter', 'compare', 'math', 'rtc',
+                ]);
+                const partnerSrcType = (p) => {
+                    switch (p.type) {
+                        case 'coil': return 'Q';
+                        case 'contact': return 'I';
+                        case 'variable': return 'VAR';
+                        case 'potentiometer': return 'POT';
+                        case 'joystick': return 'JOY';
+                        case 'analog_input': return 'AN';
+                        case 'timer': return p.timer_type === 'TON' ? 'TON' : 'TOF';
+                        case 'counter': return p.counter_type === 'UP' ? 'CTU' : 'CTD';
+                        case 'compare': return 'CMP';
+                        case 'math': return 'MATH';
+                        case 'rtc': return 'RTC';
+                    }
+                    return null;
+                };
+                const cmpScore = (a, b) => (a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1]);
+                const detectNeighbor = (ihm) => {
+                    const ix = parseFloat(ihm.x) || 0, iy = parseFloat(ihm.y) || 0;
+                    const ihmRung = this._getElementRungIndex(ihm, rungs);
+                    let bestLeft = null, bestRight = null, bestLeftScore = null, bestRightScore = null;
+                    for (const elem of ladderElements) {
+                        if (elem === ihm) continue;
+                        if (!validPartnerTypes.has(elem.type)) continue;
+                        const ex = parseFloat(elem.x) || 0, ey = parseFloat(elem.y) || 0;
+                        const sameRung = this._getElementRungIndex(elem, rungs) === ihmRung;
+                        if (!sameRung && Math.abs(ey - iy) > 20) continue;
+                        const score = [Math.abs(ey - iy), Math.abs(ex - ix)];
+                        if (ex < ix) {
+                            if (bestLeftScore === null || cmpScore(score, bestLeftScore) < 0) { bestLeft = elem; bestLeftScore = score; }
+                        } else if (ex > ix) {
+                            if (bestRightScore === null || cmpScore(score, bestRightScore) < 0) { bestRight = elem; bestRightScore = score; }
+                        }
+                    }
+                    let partner = null, direction = null;
+                    if (bestRight) { partner = bestRight; direction = 'RECEIVE'; }
+                    else if (bestLeft) { partner = bestLeft; direction = 'SEND'; }
+                    if (!partner) return null;
+                    return { direction, srcType: partnerSrcType(partner), srcName: partner.name || '', partner };
+                };
+
+                // Baud das UARTs IHM: prioriza a config da página Conectores
+                // (io_config Serial/485); senão pega do 1º bind de cada transporte.
+                const cfgIo = ioConfig || {};
+                let serBaudRaw = 115200, rs485BaudRaw = 115200;
+                for (const it of ihms) {
+                    const t = String(it.ihm_transport || '').trim();
+                    if (t === 'Serial') serBaudRaw = it.ihm_baudrate || '115200';
+                    else if (t === 'RS485') rs485BaudRaw = it.ihm_baudrate || '115200';
+                }
+                if (cfgIo.Serial_baudrate) serBaudRaw = cfgIo.Serial_baudrate;
+                if (cfgIo.RS485_baudrate) rs485BaudRaw = cfgIo.RS485_baudrate;
+                const serD = baudDiv100(serBaudRaw);
+                const rs485D = baudDiv100(rs485BaudRaw);
+
+                payload.push(0x49);                    // 'I'
+                payload.push(0x48);                    // 'H'
+                payload.push(0x04);                    // v4
+                payload.push(ihms.length & 0xFF);      // num_ihm
+                payload.push(serD & 0xFF);             // [4-5] baud Serial/100 LE
+                payload.push((serD >> 8) & 0xFF);
+                payload.push(rs485D & 0xFF);           // [6-7] baud 485/100 LE
+                payload.push((rs485D >> 8) & 0xFF);
+
+                for (let idx = 0; idx < ihms.length; idx++) {
+                    const ihm = ihms[idx];
+                    let bindId = parseInt(String(ihm.ihm_bind_id || '1'), 10);
+                    if (isNaN(bindId) || bindId < 1) bindId = 1;
+                    if (bindId > 65535) bindId = 65535;
+
+                    // Topologia automática sobrescreve direção/fonte quando há vizinho
+                    let detectedPartner = null;
+                    const det = detectNeighbor(ihm);
+                    if (det) {
+                        ihm.ihm_direction = det.direction;
+                        ihm.ihm_source_type = det.srcType;
+                        ihm.ihm_source_name = det.srcName;
+                        detectedPartner = det.partner;
+                    }
+
+                    // value_type inferido pela fonte (Q/I/CMP→BOOL; VAR FLOAT→F32; resto→I32)
+                    const srcTStr = String(ihm.ihm_source_type || 'VAR');
+                    let valueType;
+                    if (srcTStr === 'Q' || srcTStr === 'I' || srcTStr === 'CMP') {
+                        valueType = 0x03; // BOOL
+                    } else if (srcTStr === 'VAR') {
+                        valueType = 0x02; // I32 default
+                        const srcName = String(ihm.ihm_source_name || '');
+                        for (const el of ladderElements) {
+                            if (el.type === 'variable' && el.name === srcName) {
+                                if (String(el.variable_type || 'INT').toUpperCase() === 'FLOAT') valueType = 0x01;
+                                break;
+                            }
+                        }
+                    } else {
+                        valueType = 0x02; // I32
+                    }
+                    const sourceType = IHM_SOURCE_TYPE[srcTStr] != null ? IHM_SOURCE_TYPE[srcTStr] : 0x04;
+
+                    // source_index: prefere ordinal do partner detectado
+                    let sourceIndex = 0;
+                    if (detectedPartner) {
+                        if (srcTStr === 'Q' || srcTStr === 'I' || srcTStr === 'VAR') {
+                            sourceIndex = sourceIndexFromName(detectedPartner.name || '');
+                        } else {
+                            const typeMap = {
+                                POT: ['potentiometer', null], JOY: ['joystick', null],
+                                TON: ['timer', 'TON'], TOF: ['timer', 'TOF'],
+                                CTU: ['counter', 'UP'], CTD: ['counter', 'DOWN'],
+                                CMP: ['compare', null], MATH: ['math', null],
+                                AN: ['analog_input', null], RTC: ['rtc', null],
+                            };
+                            const tm = typeMap[srcTStr];
+                            if (tm) {
+                                const [targetT, subtype] = tm;
+                                let ordinal = 0;
+                                for (const el of ladderElements) {
+                                    if (el.type !== targetT) continue;
+                                    if (subtype === 'TON' && el.timer_type !== 'TON') continue;
+                                    if (subtype === 'TOF' && el.timer_type !== 'TOF') continue;
+                                    if (subtype === 'UP' && el.counter_type !== 'UP') continue;
+                                    if (subtype === 'DOWN' && el.counter_type !== 'DOWN') continue;
+                                    if (el === detectedPartner) { sourceIndex = ordinal; break; }
+                                    ordinal++;
+                                }
+                            }
+                        }
+                    } else {
+                        sourceIndex = sourceIndexFromName(ihm.ihm_source_name || '');
+                    }
+
+                    const transport = transportMask(ihm.ihm_transport || 'Serial', ihm.ihm_can_bus || 'CAN1');
+                    const direction = IHM_DIRECTION[String(ihm.ihm_direction || 'SEND').toUpperCase()] || 0;
+                    let periodMs = parseInt(String(ihm.ihm_period_ms || '100'), 10);
+                    if (isNaN(periodMs)) periodMs = 100;
+                    periodMs = Math.max(0, Math.min(periodMs, 65535));
+                    const rungIndex = this._getElementRungIndex(ihm, rungs);
+                    const canId = parseCanId(ihm.ihm_can_address || '0x00000001');
+
+                    payload.push(0x12);                       // [0]  type IHM_BIND
+                    payload.push(idx & 0xFF);                 // [1]  index
+                    payload.push(bindId & 0xFF);              // [2]
+                    payload.push((bindId >> 8) & 0xFF);       // [3]  bind_id LE
+                    payload.push(valueType & 0xFF);           // [4]
+                    payload.push(sourceType & 0xFF);          // [5]
+                    payload.push(sourceIndex & 0xFF);         // [6]
+                    payload.push(transport & 0xFF);           // [7]  transport bitmask
+                    payload.push(periodMs & 0xFF);            // [8]
+                    payload.push((periodMs >> 8) & 0xFF);     // [9]  period_ms LE
+                    payload.push(rungIndex & 0xFF);           // [10]
+                    payload.push(direction & 0xFF);           // [11]
+                    payload.push(canId & 0xFF);               // [12-15] can_id LE
+                    payload.push((canId >> 8) & 0xFF);
+                    payload.push((canId >> 16) & 0xFF);
+                    payload.push((canId >> 24) & 0xFF);
+                    // [16-24] estado runtime (send_init, last_send_time, rx_value) — zerado
+                    for (let k = 0; k < 9; k++) payload.push(0x00);
+                }
+            }
+        }
 
         // Bloco LU (Elk JS script) — magic 0x4C 0x55 + len (2 LE) + bytes UTF-8
         // Equivalente ao LUA_BLOCK_MAGIC do firmware (plc.h)

@@ -16,6 +16,7 @@ const COMPONENT_DATA = {
     math:         { label: "Matemática",    icon: "——[MTH]——" },
     can:          { label: "CAN",           icon: "——[CAN]——" },
     rtc:          { label: "RTC",           icon: "——[RTC]——" },
+    ihm:          { label: "IHM",           icon: "——[IHM]——" },
 };
 
 const COMPONENT_DYNAMIC_ICONS = {
@@ -43,12 +44,12 @@ const COMPONENT_DYNAMIC_ICONS = {
         SUB:     "——[−]——",
         MUL:     "——[×]——",
         DIV:     "——[÷]——",
-        FORMULA: "—[F>x]—",
+        FORMULA: "——[F>x]——",
     },
     counter: {
         UP:    "——[CTU]——",
         DOWN:  "——[CTD]——",
-        RESET: "——[CTR]——",
+        RESET: "——[RST]——",
     },
     joystick:     "——[JOY]——",
     potentiometer:"——[POT]——",
@@ -57,6 +58,7 @@ const COMPONENT_DYNAMIC_ICONS = {
     variable:     "——[VAR]——",
     can:          "——[CAN]——",
     rtc:          "——[RTC]——",
+    ihm:          "——[IHM]——",
 };
 
 // Labels abreviados para toolbar (do Python)
@@ -67,13 +69,14 @@ const SHORT_LABELS = {
     "Variável":      "Var",
     "Contador":      "Cont",
     "Comparador":    "Comp",
-    "Matemática":    "Math"
+    "Matemática":    "Math",
+    "IHM":           "IHM"
 };
 
 // Ordem dos componentes na toolbar (do Python)
 const COMPONENT_TOOLBAR_ORDER = [
     "branch", "contact", "coil", "joystick", "potentiometer",
-    "analog_input", "variable", "timer", "counter", "compare", "math", "can", "rtc"
+    "analog_input", "variable", "timer", "counter", "compare", "math", "can", "rtc", "ihm"
 ];
 
 const COMPONENT_HALF_WIDTH = 35;
@@ -86,6 +89,7 @@ function getDefaultName(elements, compType) {
         joystick: "JOY", branch: "B", potentiometer: "POT",
         analog_input: "AN", compare: "CMP", math: "MATH",
         variable: "VAR", variable_contact: "VC", can: "CAN", rtc: "RTC",
+        ihm: "IHM",
     };
     const prefix = prefixes[compType] || "E";
     const existing = new Set();
@@ -195,6 +199,29 @@ function createNewElement(compType, x, y, elements) {
         element.rtc_segundos = '0';
         element.rtc_data = '01/01/2025';
         element.rtc_horario = '00:00:00';
+    } else if (compType === 'ihm') {
+        // IHM ESP32-S3 bind — componente fonte + transporte CAN/Serial (igual ao Python).
+        // bind_id começa em 1 e pega o menor livre entre os IHMs já no canvas.
+        const usedIds = new Set();
+        elements.forEach(e => {
+            if (e.type === 'ihm') {
+                const v = parseInt(e.ihm_bind_id, 10);
+                if (!isNaN(v)) usedIds.add(v);
+            }
+        });
+        let nextId = 1;
+        while (usedIds.has(nextId)) nextId++;
+        element.ihm_bind_id = String(nextId);
+        element.ihm_value_type = 'I32';      // inferido no serializer pela fonte
+        element.ihm_source_type = 'Q';       // usado só em SEND/BOTH
+        element.ihm_source_name = 'Q0.0';
+        element.ihm_transport = 'CAN';
+        element.ihm_can_bus = 'CAN1';
+        element.ihm_can_address = '0x00000001';
+        element.ihm_baudrate = '115200';     // só Serial/485
+        element.ihm_period_ms = '100';
+        element.ihm_direction = 'RECEIVE';   // caso comum: IHM alimenta o PLC
+        element.ihm_binding = '';
     }
 
     return element;
@@ -248,6 +275,7 @@ const COMPONENT_SVG_ICONS = {
     math:    `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="14" height="14" rx="2"/><line x1="10" x2="10" y1="7" y2="13"/><line x1="7" x2="13" y1="10" y2="10"/></svg>`,
     can:     `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10" cy="3" r="2"/><circle cx="3" cy="16" r="2"/><circle cx="17" cy="16" r="2"/><line x1="10" x2="4.5" y1="5" y2="14"/><line x1="10" x2="15.5" y1="5" y2="14"/><line x1="5" x2="15" y1="16" y2="16"/></svg>`,
     rtc:     `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="14" height="13" rx="2"/><line x1="3" x2="17" y1="9" y2="9"/><line x1="7" x2="7" y1="2" y2="6"/><line x1="13" x2="13" y1="2" y2="6"/><line x1="10" x2="10" y1="12" y2="14"/><line x1="10" x2="12" y1="14" y2="15"/></svg>`,
+    ihm:     `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="4" width="16" height="11" rx="2"/><line x1="7" x2="13" y1="18" y2="18"/><line x1="10" x2="10" y1="15" y2="18"/><circle cx="6" cy="9.5" r="1.2" fill="currentColor"/><line x1="9" x2="14" y1="8" y2="8"/><line x1="9" x2="14" y1="11" y2="11"/></svg>`,
     rung:    `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="2" x2="18" y1="10" y2="10"/><line x1="2" x2="2" y1="6" y2="14"/><line x1="18" x2="18" y1="6" y2="14"/></svg>`,
 };
 
